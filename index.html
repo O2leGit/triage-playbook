@@ -22,17 +22,25 @@
     </div>
   </section>
   <div class="auth-card">
-    <h1>Sign in</h1>
-    <p>We will email you a magic link. No password.</p>
+    <h1>Get in. 3 steps.</h1>
+    <ol style="padding-left:20px;margin-bottom:16px;color:var(--muted);font-size:14px;line-height:1.7">
+      <li>Type your email</li>
+      <li>Check your inbox for a magic link</li>
+      <li>Tap the link. You are in.</li>
+    </ol>
     <form id="magic-form">
       <div class="field">
         <label for="email">Email</label>
-        <input id="email" class="input" type="email" autocomplete="email" required placeholder="you@company.com" />
+        <input id="email" class="input" type="email" autocomplete="email" required placeholder="you@company.com" value="chris@cotoole.com" />
       </div>
       <button class="btn btn-primary" type="submit" style="width:100%">Send magic link</button>
+      <p id="sent-msg" class="text-sm text-muted mt-1 hidden" style="text-align:center">Link sent. Check your inbox.</p>
     </form>
     <hr class="divider" />
-    <p class="text-sm text-muted">Curious first? <a href="playbook.html">Read the method</a>.</p>
+    <button id="dev-in" class="btn btn-gold" style="width:100%">Skip sign-in (dev mode)</button>
+    <p class="text-xs text-muted mt-1" style="text-align:center">One-tap guest session. Data persists on this device.</p>
+    <hr class="divider" />
+    <p class="text-sm text-muted">Curious first? <a href="playbook.html">Read the method</a>. No sign-in needed to browse.</p>
   </div>
 </div>
 
@@ -130,8 +138,25 @@ function showAuth() {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('email').value.trim();
-      try { await sendMagicLink(email); toast('Check your email for a magic link', 'ok'); }
-      catch (err) { toast('Error: ' + err.message, 'err'); }
+      try {
+        await sendMagicLink(email);
+        document.getElementById('sent-msg').classList.remove('hidden');
+        toast('Magic link sent. Check your inbox.', 'ok');
+      } catch (err) { toast('Error: ' + err.message, 'err'); }
+    });
+  }
+  const dev = document.getElementById('dev-in');
+  if (dev && !dev.dataset.bound) {
+    dev.dataset.bound = '1';
+    dev.addEventListener('click', async () => {
+      dev.disabled = true; dev.textContent = 'Signing in...';
+      try {
+        const { error } = await supabase.auth.signInAnonymously();
+        if (error) throw error;
+      } catch (err) {
+        toast('Anonymous auth disabled. Falling back to magic link for chris@cotoole.com.', 'err');
+        try { await sendMagicLink('chris@cotoole.com'); document.getElementById('sent-msg').classList.remove('hidden'); } catch {}
+      } finally { dev.disabled = false; dev.textContent = 'Skip sign-in (dev mode)'; }
     });
   }
 }
