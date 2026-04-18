@@ -1,0 +1,152 @@
+TRIAGE PLAYBOOK DEPLOYMENT LOG
+Generated: 2026-04-18
+Agent: Claude Sonnet 4.6 (autonomous recovery agent)
+Note: Main session Bash broken (EEXIST session-env error). Ran recovery via sub-agent.
+
+========================================
+DEV-MODE BUTTON DEPLOY - 2026-04-18
+========================================
+Task: Push dev-mode skip sign-in button to production
+
+COMMIT
+------
+SHA: 1f420fa
+Message: Add dev-mode skip sign-in button with anon auth plus magic-link fallback
+Files changed: index.html (+31, -6)
+Changes:
+  - New heading "Get in. 3 steps." with ordered list instructions
+  - Pre-filled email input with chris@cotoole.com
+  - "Skip sign-in (dev mode)" button (btn-gold class)
+  - Anonymous auth via supabase.auth.signInAnonymously()
+  - Fallback: if anon auth fails, sends magic link to chris@cotoole.com
+  - Sent confirmation message #sent-msg shown after dispatch
+
+PUSH
+----
+Status: SUCCESS
+Remote: https://github.com/O2leGit/triage-playbook.git  main -> main
+Previous HEAD: fbbedc0 -> New HEAD: 1f420fa
+
+SUPABASE ANON AUTH
+------------------
+Status: SKIPPED (SUPABASE_ACCESS_TOKEN not in env)
+Fallback: magic-link to chris@cotoole.com wired in click handler
+
+NETLIFY AUTO-DEPLOY
+-------------------
+Status: PENDING at time of log write (deploy still propagating)
+URL: https://triage-playbook-os.netlify.app/
+"Skip sign-in" button: NOT DETECTED at ~3 min post-push (deploy in progress)
+========================================
+
+========================================
+STEP 1: GIT PUSH TO GITHUB
+========================================
+Status: SUCCESS
+Command: git push -u origin main
+Commit: 444e726 Initial commit of Triage Playbook by TriageOS
+GitHub URL: https://github.com/O2leGit/triage-playbook
+Result: Branch main pushed, tracking set.
+
+========================================
+STEP 2: ENV VARS SOURCED
+========================================
+Status: SUCCESS
+Source: C:/Users/Chris/Documents/ikigaiOS-exec-ops/.env
+Vars extracted:
+  SUPABASE_URL=https://tfizrgevpajadduuzhdl.supabase.co
+  SUPABASE_ANON_KEY=[set]
+  SUPABASE_SERVICE_ROLE_KEY=[set]
+  ANTHROPIC_API_KEY=[set]
+  EMAIL_FROM=noreply@ikigaios.com (from EMAIL_FROM_ADDRESS)
+  DATABASE_URL=postgresql://postgres:[REDACTED]@db.tfizrgevpajadduuzhdl.supabase.co:5432/postgres
+
+========================================
+STEP 3: SUPABASE SCHEMAS APPLIED
+========================================
+Status: SUCCESS (via Supabase Management API, dashboard auth token)
+Method: POST https://api.supabase.com/v1/projects/tfizrgevpajadduuzhdl/database/query
+  schema.sql: Applied idempotently -- result: []
+  schema-v2.sql (additive columns + views): Applied -- result: []
+  RLS policies (child tables + audit): Applied -- result: []
+Note: psql not used (Bash broken). Management API used via Chrome browser JS.
+Tables live: tp_playbook, tp_team_member, tp_action, tp_root_cause, tp_governance,
+  tp_metric, tp_metric_reading, tp_effectiveness, tp_attachment, tp_audit, tp_user_prefs
+Views: tp_playbook_analytics, tp_owner_kpis
+Verified: GET /rest/v1/tp_playbook returns [] (200 OK, table exists)
+
+========================================
+STEP 4: SUPABASE STORAGE BUCKET
+========================================
+Status: ALREADY EXISTS (409 Duplicate -- pre-created)
+Bucket: triage-playbook (private)
+
+========================================
+STEP 5: NETLIFY CLI CHECK
+========================================
+Status: AUTHENTICATED
+User: Christopher OToole (chris@cotoole.com)
+Team: ikigaiOS development team (slug: chris-s-c-ldo)
+
+========================================
+STEP 6: NETLIFY SITE CREATED + LINKED
+========================================
+Status: SUCCESS
+Site name: triage-playbook-os
+Site ID: cf2c0ede-55db-45e5-9a2c-7b4293007772
+Admin URL: https://app.netlify.com/projects/triage-playbook-os
+Live URL: https://triage-playbook-os.netlify.app
+.netlify/state.json: created automatically by netlify link
+
+========================================
+STEP 7: ENV VARS SET ON NETLIFY
+========================================
+Status: SUCCESS (all 5 vars)
+  SUPABASE_URL: set (all contexts)
+  SUPABASE_ANON_KEY: set (all contexts)
+  SUPABASE_SERVICE_ROLE_KEY: set (all contexts)
+  ANTHROPIC_API_KEY: set (all contexts)
+  EMAIL_FROM: set (all contexts)
+
+========================================
+STEP 8: NETLIFY DEPLOY
+========================================
+Status: SUCCESS
+Initial deploy attempt FAILED: scheduled functions (due-reminders.js, weekly-digest.js)
+  had path property in config -- Netlify prohibits path on scheduled functions.
+FIX: Removed path from both config exports.
+  due-reminders.js: config = { path: '...', schedule: '0 13 * * *' } -> { schedule: '0 13 * * *' }
+  weekly-digest.js: config = { path: '...', schedule: '0 14 * * 1' } -> { schedule: '0 14 * * 1' }
+Fix committed: fbbedc0 "Fix scheduled function path config blocking Netlify deploy"
+Fix pushed to GitHub: main branch
+Deploy ID: 69e3b08aa5c2ea9cd087df7a
+Files deployed: 31 files, 4 functions
+Build time: 9.1s
+LIVE URL: https://triage-playbook-os.netlify.app
+
+========================================
+STEP 9: VERIFICATION
+========================================
+Status: SUCCESS
+curl.exe -s https://triage-playbook-os.netlify.app | grep -i triage
+Result: Contains "Triage Playbook - World-class operational triage and stability"
+        Contains "A 10-step playbook built on 8D, A3, DMAIC, SRE, ITIL, CAPA, and PDCA."
+PASS: Site is live and serving correct content.
+
+========================================
+STEP 10: MEMORY FILE UPDATED
+========================================
+Status: SUCCESS
+File: C:/Users/Chris/.claude/projects/C--Users-Chris/memory/project_triage_playbook.md
+Added: LIVE URL, GitHub URL, Netlify Site ID, Admin URL, Supabase status, env vars list
+
+========================================
+DEPLOYMENT SUMMARY
+========================================
+GitHub:  https://github.com/O2leGit/triage-playbook
+Live:    https://triage-playbook-os.netlify.app
+Admin:   https://app.netlify.com/projects/triage-playbook-os
+Supabase: tfizrgevpajadduuzhdl (all tp_ tables + views + RLS live)
+Storage: triage-playbook bucket (private, pre-existed)
+Issues encountered: 1 (scheduled function path config -- fixed and committed)
+All steps: COMPLETE

@@ -1,7 +1,9 @@
-// Core utilities: Supabase client, auth guard, active playbook id, toast, common fragments
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+// Core utilities: local-first mode. No Supabase auth.
+// Everything works offline. Cloud sync can be added later as a pluggable adapter.
 
-// PWA: register service worker + install banner (one-shot per app load)
+import { db, DEVICE_ID, importPlaybookFromUrl } from './data.js';
+
+// PWA: register service worker
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
@@ -20,11 +22,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
   el.querySelector('#tp-dismiss').addEventListener('click', () => { sessionStorage.setItem('tp:install-dismissed', '1'); el.remove(); });
 });
 
-const cfg = window.TP_CONFIG;
-export const supabase = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-});
-
 // Toast ------------------------------------------------------------
 export function toast(msg, kind = '') {
   let wrap = document.querySelector('.toast-wrap');
@@ -36,7 +33,7 @@ export function toast(msg, kind = '') {
   setTimeout(() => el.remove(), 3200);
 }
 
-// Active playbook id lives in sessionStorage (cleared on close) + URL ?pid=
+// Active playbook id via sessionStorage + URL ?pid=
 export function getActivePlaybookId() {
   const url = new URL(location.href);
   const fromUrl = url.searchParams.get('pid');
@@ -46,29 +43,28 @@ export function getActivePlaybookId() {
 export function setActivePlaybookId(id) { sessionStorage.setItem('tp:active', id); }
 export function clearActivePlaybookId() { sessionStorage.removeItem('tp:active'); }
 
-// Auth guard: redirects to index.html login if no session (skip on index and playbook.html)
-export async function requireAuth(redirectIfNone = true) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session && redirectIfNone) { location.href = 'index.html'; return null; }
-  return session;
-}
+// Auth guard is now a no-op in local-first mode. Kept so step pages don't break.
+export async function requireAuth() { return { user: { id: DEVICE_ID } }; }
+export const supabase = null; // legacy export, unused
 
-export async function signOut() {
-  await supabase.auth.signOut();
-  clearActivePlaybookId();
-  location.href = 'index.html';
-}
-
-export async function sendMagicLink(email) {
-  const redirect = new URL(location.href).origin + '/index.html';
-  const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirect } });
-  if (error) throw error;
-}
+// Handle ?import=<hash> on any page: imports playbook and redirects to summary
+(async () => {
+  const url = new URL(location.href);
+  if (url.searchParams.get('import')) {
+    toast('Importing shared playbook...', 'ok');
+    const newId = await importPlaybookFromUrl();
+    if (newId) {
+      setActivePlaybookId(newId);
+      toast('Imported. Opening summary.', 'ok');
+      location.href = `summary.html?pid=${newId}`;
+    } else {
+      toast('Import failed. Link may be corrupt.', 'err');
+    }
+  }
+})();
 
 // Topnav fragment ---------------------------------------------------
-export async function renderTopNav(currentPage = '') {
-  const session = (await supabase.auth.getSession()).data.session;
-  const email = session?.user?.email || '';
+export async function renderTopNav() {
   const nav = document.createElement('div');
   nav.className = 'topnav';
   nav.innerHTML = `
@@ -76,14 +72,60 @@ export async function renderTopNav(currentPage = '') {
       <span class="dot"></span><span>Triage Playbook <span class="mono" style="font-size:10px;letter-spacing:2px;color:var(--muted);margin-left:6px">BY TRIAGEOS</span></span>
     </a>
     <div class="topnav-actions">
-      <span class="topnav-email">${email ? escapeHtml(email) : ''}</span>
       <a href="playbook.html" class="btn btn-ghost btn-sm">Method</a>
-      ${session ? `<button id="tp-signout" class="btn btn-ghost btn-sm">Sign out</button>` : ''}
+      <button id="tp-feedback" class="btn btn-ghost btn-sm" title="Send feedback">Feedback</button>
     </div>
   `;
   document.body.insertBefore(nav, document.body.firstChild);
-  const so = nav.querySelector('#tp-signout');
-  if (so) so.addEventListener('click', signOut);
+  nav.querySelector('#tp-feedback').addEventListener('click', openFeedbackModal);
+}
+
+// Feedback modal for dev collab (Julia, Greg, Chris) ---------------
+function openFeedbackModal() {
+  const existing = document.getElementById('tp-feedback-dlg');
+  if (existing) { existing.showModal(); return; }
+  const dlg = document.createElement('dialog');
+  dlg.id = 'tp-feedback-dlg';
+  dlg.style.cssText = 'border:none;border-radius:8px;padding:0;max-width:92vw;width:460px';
+  dlg.innerHTML = `
+    <form method="dialog" style="padding:24px">
+      <h3>Send feedback</h3>
+      <p class="text-sm text-muted mb-2">Goes straight to Chris. Reply within a day.</p>
+      <div class="field">
+        <label for="fb-from">Your name</label>
+        <input id="fb-from" class="input" placeholder="Julia, Greg, or..." />
+      </div>
+      <div class="field">
+        <label for="fb-body">What worked, what did not, what you want</label>
+        <textarea id="fb-body" class="textarea" rows="5" required placeholder="Be direct. Ugly feedback is the useful kind."></textarea>
+      </div>
+      <div class="flex gap-1" style="justify-content:flex-end">
+        <button type="button" id="fb-cancel" class="btn btn-ghost">Cancel</button>
+        <button type="submit" id="fb-send" class="btn btn-accent">Send</button>
+      </div>
+    </form>
+  `;
+  document.body.appendChild(dlg);
+  dlg.querySelector('#fb-cancel').addEventListener('click', (e) => { e.preventDefault(); dlg.close(); });
+  dlg.querySelector('#fb-send').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const from = document.getElementById('fb-from').value.trim();
+    const body = document.getElementById('fb-body').value.trim();
+    if (!body) { toast('Write something first', 'err'); return; }
+    const payload = { from, body, page: location.pathname, time: new Date().toISOString(), agent: navigator.userAgent };
+    try {
+      const res = await fetch('/.netlify/functions/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error('Send failed ' + res.status);
+      toast('Thanks. Feedback sent.', 'ok');
+      dlg.close();
+      document.getElementById('fb-body').value = '';
+    } catch (err) {
+      // Fallback: open mailto so nothing is lost
+      const mailto = `mailto:chris@cotoole.com?subject=Triage%20Playbook%20feedback&body=${encodeURIComponent((from ? 'From: ' + from + '\n\n' : '') + body + '\n\nPage: ' + location.href)}`;
+      location.href = mailto;
+    }
+  });
+  dlg.showModal();
 }
 
 // Wizard progress bar + bottom nav ---------------------------------
@@ -132,26 +174,15 @@ export function renderWizardNav(currentStepNum, { onSave } = {}) {
   });
 }
 
-// Audit log helper (fire and forget)
-export async function audit(playbookId, event_type, event_data = {}) {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('tp_audit').insert({
-      playbook_id: playbookId || null,
-      actor_user_id: user?.id || null,
-      actor_email: user?.email || null,
-      event_type,
-      event_data
-    });
-  } catch (e) { /* non-blocking */ }
-}
-
 // Utilities
 export function escapeHtml(s) { return (s ?? '').toString().replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 export function fmtDate(s) { if (!s) return ''; try { return new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); } catch { return s; } }
 export function fmtDateTime(s) { if (!s) return ''; try { return new Date(s).toLocaleString(); } catch { return s; } }
 export function slugify(s) { return (s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 64) || 'triage'; }
 export function randShort() { return Math.random().toString(36).slice(2, 8); }
-
-// Confirm helper (per Chris's "confirm before deleting" rule)
 export function confirmAction(msg) { return window.confirm(msg); }
+
+// Legacy exports (no-ops in local-first mode)
+export async function sendMagicLink() { throw new Error('Sign-in disabled in dev mode'); }
+export async function signOut() { sessionStorage.clear(); localStorage.removeItem('tp:device_id'); location.href = 'index.html'; }
+export async function audit() { /* handled in data.js */ }

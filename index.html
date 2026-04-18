@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f1e35" />
   <title>Triage Playbook - World-class operational triage and stability</title>
-  <meta name="description" content="Guide any operator through a 10-step triage, containment, root cause, action plan, governance, monitoring, and effectiveness verification. Built on 8D, A3, DMAIC, SRE, ITIL, CAPA, and PDCA." />
+  <meta name="description" content="Guide any operator through a 10-step triage, containment, root cause, action plan, governance, monitoring, and effectiveness verification." />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -13,43 +13,11 @@
   <script src="/assets/js/config.js"></script>
 </head>
 <body>
-<div id="auth-screen" class="hidden">
-  <section class="hero">
-    <div class="hero-inner">
-      <div class="label">Operational triage and stability</div>
-      <h1>Guide any operator from first alarm to <em>sustained fix</em>.</h1>
-      <p class="subtitle">A 10-step playbook built on 8D, A3, DMAIC, SRE, ITIL, CAPA, and PDCA. Triage in hours. Verify in weeks. Loop back if metrics do not move.</p>
-    </div>
-  </section>
-  <div class="auth-card">
-    <h1>Get in. 3 steps.</h1>
-    <ol style="padding-left:20px;margin-bottom:16px;color:var(--muted);font-size:14px;line-height:1.7">
-      <li>Type your email</li>
-      <li>Check your inbox for a magic link</li>
-      <li>Tap the link. You are in.</li>
-    </ol>
-    <form id="magic-form">
-      <div class="field">
-        <label for="email">Email</label>
-        <input id="email" class="input" type="email" autocomplete="email" required placeholder="you@company.com" value="chris@cotoole.com" />
-      </div>
-      <button class="btn btn-primary" type="submit" style="width:100%">Send magic link</button>
-      <p id="sent-msg" class="text-sm text-muted mt-1 hidden" style="text-align:center">Link sent. Check your inbox.</p>
-    </form>
-    <hr class="divider" />
-    <button id="dev-in" class="btn btn-gold" style="width:100%">Skip sign-in (dev mode)</button>
-    <p class="text-xs text-muted mt-1" style="text-align:center">One-tap guest session. Data persists on this device.</p>
-    <hr class="divider" />
-    <p class="text-sm text-muted">Curious first? <a href="playbook.html">Read the method</a>. No sign-in needed to browse.</p>
-  </div>
-</div>
-
-<div id="app" class="hidden">
   <section class="hero">
     <div class="hero-inner">
       <div class="label">Your triage dashboard</div>
       <h1>Every fire, one <em>repeatable</em> method.</h1>
-      <p class="subtitle">Start a new triage or resume one in flight. Every playbook is cloud-synced, mobile-friendly, and audit-trailed.</p>
+      <p class="subtitle">Start a new triage or resume one in flight. Everything saves to your browser. No sign-in.</p>
       <div class="flex gap-1 flex-wrap" style="margin-top:24px">
         <button id="new-btn" class="btn btn-gold">Start a new triage</button>
         <a href="playbook.html" class="btn btn-ghost" style="background:rgba(248,246,241,0.08); color:var(--white); border-color:rgba(248,246,241,0.18)">How it works</a>
@@ -59,11 +27,11 @@
 
   <div class="container">
     <h2>Portfolio analytics</h2>
-    <p class="text-muted mb-2">Your triage portfolio at a glance. Drill into any playbook below.</p>
+    <p class="text-muted mb-2">Your triage portfolio at a glance.</p>
     <div id="kpi-row" class="card-grid" style="margin-bottom:24px"></div>
 
     <h2>Active playbooks</h2>
-    <p class="text-muted mb-3">Most recently updated first. Filter by status, severity, or project code.</p>
+    <p class="text-muted mb-3">Most recently updated first. Filter by status or search.</p>
     <div class="card" style="margin-bottom:14px">
       <div class="two-col">
         <div class="field"><label for="filter-q">Search (title, project, impact)</label><input id="filter-q" class="input" placeholder="e.g. scrap, MPLS, P1" /></div>
@@ -85,7 +53,6 @@
       <button id="empty-new" class="btn btn-accent">Start your first triage</button>
     </div>
   </div>
-</div>
 
 <!-- New-triage modal -->
 <dialog id="new-dialog" style="border:none;border-radius:8px;padding:0;max-width:92vw;width:460px">
@@ -119,55 +86,8 @@
 </dialog>
 
 <script type="module">
-import { supabase, toast, renderTopNav, setActivePlaybookId, escapeHtml, fmtDateTime, confirmAction, sendMagicLink } from '/assets/js/core.js';
-import { createPlaybook, listPlaybooks, deletePlaybook } from '/assets/js/data.js';
-import { detectDuplicates } from '/assets/js/ai.js';
-
-async function boot() {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) showAuth(); else showApp();
-  supabase.auth.onAuthStateChange((_ev, s) => { if (s) showApp(); else showAuth(); });
-}
-
-function showAuth() {
-  document.getElementById('auth-screen').classList.remove('hidden');
-  document.getElementById('app').classList.add('hidden');
-  const form = document.getElementById('magic-form');
-  if (!form.dataset.bound) {
-    form.dataset.bound = '1';
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const email = document.getElementById('email').value.trim();
-      try {
-        await sendMagicLink(email);
-        document.getElementById('sent-msg').classList.remove('hidden');
-        toast('Magic link sent. Check your inbox.', 'ok');
-      } catch (err) { toast('Error: ' + err.message, 'err'); }
-    });
-  }
-  const dev = document.getElementById('dev-in');
-  if (dev && !dev.dataset.bound) {
-    dev.dataset.bound = '1';
-    dev.addEventListener('click', async () => {
-      dev.disabled = true; dev.textContent = 'Signing in...';
-      try {
-        const { error } = await supabase.auth.signInAnonymously();
-        if (error) throw error;
-      } catch (err) {
-        toast('Anonymous auth disabled. Falling back to magic link for chris@cotoole.com.', 'err');
-        try { await sendMagicLink('chris@cotoole.com'); document.getElementById('sent-msg').classList.remove('hidden'); } catch {}
-      } finally { dev.disabled = false; dev.textContent = 'Skip sign-in (dev mode)'; }
-    });
-  }
-}
-
-async function showApp() {
-  document.getElementById('auth-screen').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  await renderTopNav();
-  await loadList();
-  bindNew();
-}
+import { toast, renderTopNav, setActivePlaybookId, escapeHtml, fmtDateTime, confirmAction } from '/assets/js/core.js';
+import { createPlaybook, listPlaybooks, deletePlaybook, exportPlaybookAsUrl } from '/assets/js/data.js';
 
 let ALL_ROWS = [];
 
@@ -175,7 +95,7 @@ function renderKpis(rows) {
   const host = document.getElementById('kpi-row');
   const open = rows.filter(r => r.status !== 'closed').length;
   const closed = rows.filter(r => r.status === 'closed');
-  const mttrHours = closed.map(r => (new Date(r.closed_at) - new Date(r.created_at)) / 36e5).filter(h => h > 0);
+  const mttrHours = closed.map(r => (new Date(r.closed_at || r.updated_at) - new Date(r.created_at)) / 36e5).filter(h => h > 0);
   const avgMttr = mttrHours.length ? (mttrHours.reduce((a,b)=>a+b,0) / mttrHours.length).toFixed(1) : null;
   const p1p2 = rows.filter(r => (r.severity === 'P1' || r.severity === 'P2') && r.status !== 'closed').length;
   const reopened = rows.filter(r => r.status === 'reopened').length;
@@ -184,34 +104,6 @@ function renderKpis(rows) {
     <div class="card"><div class="label">Closed</div><h3 style="font-size:36px;margin-top:8px">${closed.length}</h3><p class="text-xs text-muted">${reopened} re-opened for loop-back</p></div>
     <div class="card"><div class="label">Avg MTTR</div><h3 style="font-size:36px;margin-top:8px">${avgMttr ? avgMttr + 'h' : '—'}</h3><p class="text-xs text-muted">Mean time from open to close</p></div>
   `;
-}
-
-function applyFilters() {
-  const q = (document.getElementById('filter-q')?.value || '').toLowerCase();
-  const s = document.getElementById('filter-status')?.value || '';
-  let rows = ALL_ROWS;
-  if (q) rows = rows.filter(r => (r.title + ' ' + (r.project_code||'') + ' ' + (r.impact_summary||'') + ' ' + (r.severity||'')).toLowerCase().includes(q));
-  if (s) rows = rows.filter(r => r.status === s);
-  const host = document.getElementById('pb-list');
-  host.innerHTML = '';
-  const empty = document.getElementById('empty');
-  if (!rows.length) { empty.classList.remove('hidden'); return; } else empty.classList.add('hidden');
-  for (const r of rows) host.appendChild(renderRow(r));
-}
-
-async function loadList() {
-  const host = document.getElementById('pb-list');
-  host.innerHTML = '<div class="skeleton" style="height:120px"></div>';
-  try {
-    ALL_ROWS = await listPlaybooks();
-    renderKpis(ALL_ROWS);
-    if (!ALL_ROWS.length) { host.innerHTML = ''; document.getElementById('empty').classList.remove('hidden'); renderKpis([]); return; }
-    document.getElementById('empty').classList.add('hidden');
-    applyFilters();
-    const qi = document.getElementById('filter-q'); const si = document.getElementById('filter-status');
-    if (qi && !qi.dataset.bound) { qi.dataset.bound = '1'; qi.addEventListener('input', applyFilters); }
-    if (si && !si.dataset.bound) { si.dataset.bound = '1'; si.addEventListener('change', applyFilters); }
-  } catch (e) { host.innerHTML = ''; toast('Load failed: ' + e.message, 'err'); }
 }
 
 function statusBadge(s) {
@@ -236,15 +128,55 @@ function renderRow(r) {
     <div class="flex gap-1 flex-wrap">
       <a class="btn btn-accent btn-sm" href="start.html?pid=${r.id}">Resume</a>
       <a class="btn btn-ghost btn-sm" href="summary.html?pid=${r.id}">Summary</a>
+      <button class="btn btn-ghost btn-sm" data-share="${r.id}">Share link</button>
       <button class="btn btn-danger btn-sm" data-del="${r.id}">Delete</button>
     </div>
   `;
+  el.querySelector('[data-share]').addEventListener('click', async () => {
+    try {
+      const url = await exportPlaybookAsUrl(r.id);
+      await navigator.clipboard.writeText(url);
+      toast('Share link copied. Paste to Julia or Greg.', 'ok');
+    } catch (e) { toast('Share failed: ' + e.message, 'err'); }
+  });
   el.querySelector('[data-del]').addEventListener('click', async () => {
     if (!confirmAction(`Delete "${r.title}"? This cannot be undone.`)) return;
     try { await deletePlaybook(r.id); toast('Deleted', 'ok'); loadList(); }
     catch (e) { toast('Delete failed: ' + e.message, 'err'); }
   });
   return el;
+}
+
+function applyFilters() {
+  const q = (document.getElementById('filter-q').value || '').toLowerCase();
+  const s = document.getElementById('filter-status').value || '';
+  let rows = ALL_ROWS;
+  if (q) rows = rows.filter(r => ((r.title || '') + ' ' + (r.project_code||'') + ' ' + (r.impact_summary||'') + ' ' + (r.severity||'')).toLowerCase().includes(q));
+  if (s) rows = rows.filter(r => r.status === s);
+  const host = document.getElementById('pb-list');
+  const empty = document.getElementById('empty');
+  host.innerHTML = '';
+  if (!rows.length) { empty.classList.remove('hidden'); return; } else empty.classList.add('hidden');
+  for (const r of rows) host.appendChild(renderRow(r));
+}
+
+async function loadList() {
+  const host = document.getElementById('pb-list');
+  host.innerHTML = '<div class="skeleton" style="height:120px"></div>';
+  try {
+    ALL_ROWS = await listPlaybooks();
+    renderKpis(ALL_ROWS);
+    if (!ALL_ROWS.length) {
+      host.innerHTML = '';
+      document.getElementById('empty').classList.remove('hidden');
+      return;
+    }
+    document.getElementById('empty').classList.add('hidden');
+    applyFilters();
+    const qi = document.getElementById('filter-q'); const si = document.getElementById('filter-status');
+    if (qi && !qi.dataset.bound) { qi.dataset.bound = '1'; qi.addEventListener('input', applyFilters); }
+    if (si && !si.dataset.bound) { si.dataset.bound = '1'; si.addEventListener('change', applyFilters); }
+  } catch (e) { host.innerHTML = ''; toast('Load failed: ' + e.message, 'err'); }
 }
 
 function bindNew() {
@@ -260,17 +192,6 @@ function bindNew() {
     const severity = document.getElementById('t-sev').value;
     const impact_summary = document.getElementById('t-impact').value.trim();
     try {
-      // Before creating, scan existing for repeat issues
-      if (ALL_ROWS.length) {
-        try {
-          const { matches } = await detectDuplicates(title, impact_summary, ALL_ROWS.map(r => ({ id: r.id, title: r.title, impact_summary: r.impact_summary })));
-          if (matches && matches.length) {
-            const top = matches[0];
-            const msg = `Possible repeat issue detected (confidence ${(top.confidence*100|0)}%):\n\n${top.reason}\n\nContinue creating a new playbook anyway?`;
-            if (!confirmAction(msg)) return;
-          }
-        } catch { /* AI optional */ }
-      }
       const pb = await createPlaybook({ title, severity, impact_summary });
       setActivePlaybookId(pb.id);
       location.href = `start.html?pid=${pb.id}`;
@@ -278,6 +199,11 @@ function bindNew() {
   });
 }
 
+async function boot() {
+  await renderTopNav();
+  await loadList();
+  bindNew();
+}
 boot();
 </script>
 </body>
