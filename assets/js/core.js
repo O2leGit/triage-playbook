@@ -158,14 +158,16 @@ export function renderProgress(currentStepNum) {
 export function renderWizardNav(currentStepNum, { onSave } = {}) {
   const prev = STEPS[currentStepNum - 2];
   const next = STEPS[currentStepNum];
+  const pid = getActivePlaybookId();
+  const qs = pid ? `?pid=${pid}` : '';
   const nav = document.createElement('div');
   nav.className = 'wizard-nav';
   nav.innerHTML = `
-    ${prev ? `<a class="btn btn-ghost" href="${prev.slug}">Back</a>` : `<span></span>`}
+    ${prev ? `<a class="btn btn-ghost" href="${prev.slug}${qs}">Back</a>` : `<span></span>`}
     <div class="center">${STEPS[currentStepNum - 1].title}</div>
     <div class="flex gap-1">
       <button class="btn btn-ghost" id="tp-save">Save</button>
-      ${next ? `<a class="btn btn-accent" href="${next.slug}" id="tp-next">Next</a>` : `<a class="btn btn-gold" href="summary.html">Review</a>`}
+      ${next ? `<a class="btn btn-accent" href="${next.slug}${qs}" id="tp-next">Next</a>` : `<a class="btn btn-gold" href="summary.html${qs}">Review</a>`}
     </div>
   `;
   document.body.appendChild(nav);
