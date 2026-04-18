@@ -53,4 +53,4 @@ async function sb(path) {
 function json(o, s=200){ return new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json' } }); }
 function escapeHtml(s){ return (s??'').toString().replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
-export const config = { path: '/.netlify/functions/due-reminders', schedule: '0 13 * * *' };
+export const config = { schedule: '0 13 * * *' };

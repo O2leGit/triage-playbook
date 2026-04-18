@@ -80,4 +80,4 @@ function mdToHtml(md){
     '</div>';
 }
 
-export const config = { path: '/.netlify/functions/weekly-digest', schedule: '0 14 * * 1' };
+export const config = { schedule: '0 14 * * 1' };
