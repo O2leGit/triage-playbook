@@ -30,9 +30,41 @@ db.version(1).stores({
 const now = () => new Date().toISOString();
 const uid = () => crypto.randomUUID();
 
-// Audit (fire and forget)
+// Audit (fire and forget). Hash-chain when enterprise/team tier is active.
+async function sha256(s) {
+  const buf = new TextEncoder().encode(s);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
 export async function audit(playbook_id, event_type, event_data = {}) {
-  try { await db.audit.add({ playbook_id, event_type, event_data, created_at: now() }); } catch {}
+  try {
+    let prev_hash = null, hash = null;
+    try {
+      const { hasFeature } = await import('./tier.js');
+      if (hasFeature('hash_chain_audit')) {
+        const last = await db.audit.orderBy('id').last();
+        prev_hash = last?.hash || 'GENESIS';
+        const ts = now();
+        hash = await sha256([prev_hash, playbook_id, event_type, JSON.stringify(event_data), ts].join('|'));
+        await db.audit.add({ playbook_id, event_type, event_data, created_at: ts, prev_hash, hash });
+        return;
+      }
+    } catch {}
+    await db.audit.add({ playbook_id, event_type, event_data, created_at: now() });
+  } catch {}
+}
+
+// Verify audit chain integrity
+export async function verifyAuditChain() {
+  const rows = await db.audit.orderBy('id').toArray();
+  let prev = 'GENESIS'; let broken = 0;
+  for (const r of rows) {
+    if (!r.hash) continue; // skip rows recorded in DEV tier
+    const expected = await sha256([r.prev_hash, r.playbook_id, r.event_type, JSON.stringify(r.event_data), r.created_at].join('|'));
+    if (expected !== r.hash || (r.prev_hash && r.prev_hash !== prev && r.prev_hash !== 'GENESIS')) broken++;
+    prev = r.hash;
+  }
+  return { rows: rows.length, chained: rows.filter(r => r.hash).length, broken };
 }
 
 // Playbook ---------------------------------------------------------

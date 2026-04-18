@@ -43,8 +43,28 @@
           </select>
         </div>
         <div class="field">
+          <label for="deviation_class">Deviation classification</label>
+          <select id="deviation_class" class="select">
+            <option value="">Not set</option>
+            <option value="minor">Minor</option>
+            <option value="major">Major</option>
+            <option value="critical">Critical (escalate)</option>
+          </select>
+        </div>
+        <div class="field">
           <label for="impact_summary">Impact ($, hours, units)</label>
           <input id="impact_summary" class="input" placeholder="$120K exposure / 8hr outage" />
+        </div>
+        <div class="field">
+          <label for="data_classification">Data classification</label>
+          <select id="data_classification" class="select">
+            <option value="internal">Internal</option>
+            <option value="public">Public</option>
+            <option value="confidential">Confidential</option>
+            <option value="restricted">Restricted (PII, IP)</option>
+            <option value="gmp">GMP / GxP</option>
+          </select>
+          <span class="hint">Restricted and GMP fields are redacted before any AI call in TEAM and ENTERPRISE tiers.</span>
         </div>
       </div>
     </div>
@@ -119,6 +139,8 @@ async function boot() {
   set('is_statement', pb.is_statement); set('is_not_statement', pb.is_not_statement);
   set('project_code', pb.project_code); set('exec_recipient', pb.exec_recipient);
   set('stakeholder_emails', pb.stakeholder_emails); set('description', pb.description);
+  set('data_classification', pb.data_classification || 'internal');
+  set('deviation_class', pb.deviation_class || '');
 
   const save = async () => {
     const title = f.querySelector('#title').value.trim();
@@ -133,7 +155,9 @@ async function boot() {
       how_many: val('how_many'), how_detected: val('how_detected'),
       is_statement: val('is_statement'), is_not_statement: val('is_not_statement'),
       project_code: val('project_code'), exec_recipient: val('exec_recipient'),
-      stakeholder_emails: val('stakeholder_emails'), description: val('description')
+      stakeholder_emails: val('stakeholder_emails'), description: val('description'),
+      data_classification: val('data_classification') || 'internal',
+      deviation_class: val('deviation_class')
     });
   };
 

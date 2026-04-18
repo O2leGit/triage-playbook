@@ -49,6 +49,11 @@
           <option value="irreversible">Irreversible</option>
         </select>
       </div>
+      <div class="field" id="cc-wrap" style="display:none">
+        <label for="change_control_id">Change Control ID</label>
+        <input id="change_control_id" class="input" placeholder="CC-2026-00123" />
+        <span class="hint">Required in TEAM/ENTERPRISE before action can move past Draft.</span>
+      </div>
     </div>
     <button id="add" class="btn btn-accent">Add action</button>
   </div>
@@ -62,6 +67,7 @@
 <script type="module">
 import { requireAuth, renderTopNav, getActivePlaybookId, renderProgress, renderWizardNav, toast, escapeHtml, confirmAction, fmtDate } from '/assets/js/core.js';
 import { listActions, addAction, updateAction, deleteAction } from '/assets/js/data.js';
+import { hasFeature } from '/assets/js/tier.js';
 
 async function boot() {
   await requireAuth(); await renderTopNav(); renderProgress(5);
@@ -87,7 +93,12 @@ async function boot() {
       </div>
     `;
     el.querySelector('[data-status]').addEventListener('change', async (e) => {
-      await updateAction(r.id, { status: e.target.value, completed_at: e.target.value === 'done' ? new Date().toISOString() : null }, pid);
+      const target = e.target.value;
+      if (hasFeature('change_control_gate') && target !== 'open' && !r.change_control_id) {
+        toast('Blocked: Change Control ID required to move past Draft', 'err');
+        e.target.value = r.status; return;
+      }
+      await updateAction(r.id, { status: target, completed_at: target === 'done' ? new Date().toISOString() : null }, pid);
       toast('Updated', 'ok');
     });
     el.querySelector('[data-del]').addEventListener('click', async () => {
@@ -107,9 +118,12 @@ async function boot() {
     prev.forEach(r => pEl.appendChild(renderRow(r)));
   }
 
+  if (hasFeature('change_control_gate')) document.getElementById('cc-wrap').style.display = '';
   document.getElementById('add').addEventListener('click', async () => {
     const description = document.getElementById('description').value.trim();
     if (!description) { toast('Description required', 'err'); return; }
+    const ccId = document.getElementById('change_control_id').value.trim();
+    if (hasFeature('change_control_gate') && !ccId) { toast('Change Control ID required in this tier', 'err'); return; }
     try {
       await addAction(pid, {
         action_type: document.getElementById('type').value,
@@ -118,6 +132,7 @@ async function boot() {
         owner_email: document.getElementById('owner_email').value.trim() || null,
         due_date: document.getElementById('due_date').value || null,
         reversibility: document.getElementById('reversibility').value,
+        change_control_id: ccId || null,
         status: 'open'
       });
       document.getElementById('description').value = '';

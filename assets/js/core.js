@@ -65,19 +65,23 @@ export const supabase = null; // legacy export, unused
 
 // Topnav fragment ---------------------------------------------------
 export async function renderTopNav() {
+  const { renderTierPill, bindTierPill } = await import('./tier.js');
   const nav = document.createElement('div');
   nav.className = 'topnav';
   nav.innerHTML = `
     <a href="index.html" class="topnav-brand" style="text-decoration:none">
       <span class="dot"></span><span>Triage Playbook <span class="mono" style="font-size:10px;letter-spacing:2px;color:var(--muted);margin-left:6px">BY TRIAGEOS</span></span>
     </a>
-    <div class="topnav-actions">
+    <div class="topnav-actions" style="align-items:center">
+      ${renderTierPill()}
       <a href="playbook.html" class="btn btn-ghost btn-sm">Method</a>
+      <a href="security.html" class="btn btn-ghost btn-sm">Security</a>
       <button id="tp-feedback" class="btn btn-ghost btn-sm" title="Send feedback">Feedback</button>
     </div>
   `;
   document.body.insertBefore(nav, document.body.firstChild);
   nav.querySelector('#tp-feedback').addEventListener('click', openFeedbackModal);
+  bindTierPill(nav);
 }
 
 // Feedback modal for dev collab (Julia, Greg, Chris) ---------------

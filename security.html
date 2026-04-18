@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1e35" />
+  <title>Security, IT, and Compliance - Triage Playbook</title>
+  <meta name="description" content="For corporate IT, Security, and Quality teams evaluating Triage Playbook. Deployment tiers, data handling, compliance readiness, vendor artifacts." />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/styles.css" />
+  <script src="/assets/js/config.js"></script>
+</head>
+<body>
+<section class="hero">
+  <div class="hero-inner">
+    <div class="label">For corporate IT and quality teams</div>
+    <h1>Security, <em>compliance,</em> and IT readiness.</h1>
+    <p class="subtitle">Triage Playbook runs in three deployment tiers. This page is for the people who have to approve us before a pilot. We tell you exactly what the app is, what it isn't, where data lives, and what controls each tier ships.</p>
+    <div class="flex gap-1 flex-wrap" style="margin-top:20px">
+      <a href="#what" class="btn btn-gold">What the app does</a>
+      <a href="#tiers" class="btn btn-ghost" style="background:rgba(248,246,241,0.08); color:var(--white); border-color:rgba(248,246,241,0.18)">Deployment tiers</a>
+      <a href="#controls" class="btn btn-ghost" style="background:rgba(248,246,241,0.08); color:var(--white); border-color:rgba(248,246,241,0.18)">Controls matrix</a>
+    </div>
+  </div>
+</section>
+
+<div class="container-narrow">
+  <h2 id="what" class="mt-2">What the app does</h2>
+  <p class="text-muted mb-2">Triage Playbook walks an operator through a 10-step structured investigation of any operational problem. It fuses incident management (SRE, ITIL), root cause analysis (A3, 5 Whys, Fishbone), and corrective and preventive action (8D, CAPA) into one workflow.</p>
+  <div class="card">
+    <h3>Who it is for</h3>
+    <ul style="padding-left:20px;color:var(--muted);line-height:1.8">
+      <li>Operations leaders responding to scrap, downtime, quality escapes, service outages, deviations</li>
+      <li>Quality Assurance investigating CAPAs and non-conformances</li>
+      <li>SRE and IT running incident response and postmortems</li>
+      <li>Supply chain managing supplier issues, lot recalls, logistics deviations</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>What it is not</h3>
+    <ul style="padding-left:20px;color:var(--muted);line-height:1.8">
+      <li>Not a replacement for a validated QMS in a regulated environment until ENTERPRISE tier plus validation pack is complete</li>
+      <li>Not a record of truth for GMP data. Links to your MES or ERP; never replaces them</li>
+      <li>Not an on-call or alerting platform. No paging, no on-call rotations, no sensor telemetry ingest</li>
+      <li>Not a replacement for TrackWise, Veeva Vault QMS, or MasterControl in regulated rollouts</li>
+    </ul>
+  </div>
+
+  <h2 id="tiers" class="mt-3">Deployment tiers</h2>
+  <p class="text-muted mb-2">Pick the tier that matches your compliance posture. Change tier at any time from the topnav pill.</p>
+  <div class="card">
+    <div class="flex gap-1" style="align-items:center;margin-bottom:8px"><span class="badge badge-gray">DEV</span><h3 style="margin:0">Solo developer, prototype, training</h3></div>
+    <p class="text-sm text-muted mb-1">Data lives in the browser via IndexedDB. No sign-in. No audit chain. No validation. Fastest iteration.</p>
+    <ul class="text-sm text-muted" style="padding-left:20px;line-height:1.7">
+      <li>Storage: IndexedDB (local only). No server. No cloud sync.</li>
+      <li>AI: optional. Calls Anthropic Claude via Netlify Function. No PHI or GMP data should be entered in this tier.</li>
+      <li>Audit: best-effort log in IndexedDB. Not tamper-evident.</li>
+      <li>Use for: product evaluation, internal training, dogfooding. Not for regulated data.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="flex gap-1" style="align-items:center;margin-bottom:8px"><span class="badge badge-blue">TEAM</span><h3 style="margin:0">Small team, pilot, non-regulated production</h3></div>
+    <p class="text-sm text-muted mb-1">Adds Part 11-style e-signature, hash-chained audit trail, enforced data classification, change-control gate, AI redaction on Restricted and GMP fields.</p>
+    <ul class="text-sm text-muted" style="padding-left:20px;line-height:1.7">
+      <li>Storage: still local IndexedDB with optional Supabase sync layer (customer-hosted Postgres acceptable).</li>
+      <li>Authentication: magic-link email or OAuth 2.0 via Supabase Auth.</li>
+      <li>Audit: SHA-256 hash-chained. Tamper-evident. Exportable.</li>
+      <li>E-signature: user ID plus session reason plus record-hash bind. Meets Part 11 intent; not validated.</li>
+      <li>AI: data classification gate. Restricted and GMP fields are redacted before prompts leave the browser.</li>
+      <li>Change control: corrective actions cannot move past draft without a linked Change Control record ID.</li>
+      <li>Use for: pilot with a small team, non-regulated operational triage, pre-production validation.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="flex gap-1" style="align-items:center;margin-bottom:8px"><span class="badge badge-green">ENTERPRISE</span><h3 style="margin:0">Regulated rollout, multi-site, GMP-ready</h3></div>
+    <p class="text-sm text-muted mb-1">All TEAM features plus enterprise SSO, ERP lot lookup, Microsoft Graph outbound (no external webhooks), validation pack.</p>
+    <ul class="text-sm text-muted" style="padding-left:20px;line-height:1.7">
+      <li>Authentication: Microsoft Entra ID (formerly Azure AD) SSO with conditional access.</li>
+      <li>Access control: group-based, mapped to quality units, sites, and product lines.</li>
+      <li>Integrations: SAP, Oracle, Veeva Vault, TrackWise via customer-hosted connectors. Lot or serial lookups validate against live systems.</li>
+      <li>Outbound messaging: Microsoft Graph only. No third-party webhooks unless on approved vendor list.</li>
+      <li>AI: DLP-scanned prompts and responses, audit-logged 10 years, configurable data boundary (e.g. Azure OpenAI in tenant).</li>
+      <li>Validation: GAMP 5 Category 4 pack (URS, FS, DS, IQ, OQ, PQ, risk, traceability). Executed with the customer's Quality Unit.</li>
+      <li>Use for: biotech, pharma, medical device, or any environment under 21 CFR Part 11, EU Annex 11, ISO 13485, GxP.</li>
+    </ul>
+  </div>
+
+  <h2 id="controls" class="mt-3">Controls matrix</h2>
+  <div class="card" style="overflow-x:auto">
+    <table class="text-sm" style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:8px">Control</th>
+          <th style="padding:8px">DEV</th>
+          <th style="padding:8px">TEAM</th>
+          <th style="padding:8px">ENTERPRISE</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:8px">Data at rest encryption</td><td style="text-align:center">Browser-managed</td><td style="text-align:center">AES-256 in Supabase</td><td style="text-align:center">AES-256 + customer KMS option</td></tr>
+        <tr><td style="padding:8px">Data in transit</td><td style="text-align:center">TLS 1.3</td><td style="text-align:center">TLS 1.3</td><td style="text-align:center">TLS 1.3 + mTLS optional</td></tr>
+        <tr><td style="padding:8px">Authentication</td><td style="text-align:center">None</td><td style="text-align:center">Magic link / OAuth</td><td style="text-align:center">Microsoft Entra SSO</td></tr>
+        <tr><td style="padding:8px">Access control</td><td style="text-align:center">Device-scoped</td><td style="text-align:center">User-scoped (RLS)</td><td style="text-align:center">Group-based (RBAC)</td></tr>
+        <tr><td style="padding:8px">Audit trail</td><td style="text-align:center">Basic local log</td><td style="text-align:center">Hash-chained</td><td style="text-align:center">Hash-chained + offsite WORM</td></tr>
+        <tr><td style="padding:8px">21 CFR Part 11 e-signature</td><td style="text-align:center">No</td><td style="text-align:center">Intent-compliant</td><td style="text-align:center">Validated with customer</td></tr>
+        <tr><td style="padding:8px">Data classification</td><td style="text-align:center">Optional</td><td style="text-align:center">Enforced</td><td style="text-align:center">Enforced + DLP integration</td></tr>
+        <tr><td style="padding:8px">AI redaction of Restricted/GMP</td><td style="text-align:center">On</td><td style="text-align:center">On</td><td style="text-align:center">On + Azure OpenAI in-tenant option</td></tr>
+        <tr><td style="padding:8px">Change control gate</td><td style="text-align:center">Off</td><td style="text-align:center">On</td><td style="text-align:center">On + ServiceNow link</td></tr>
+        <tr><td style="padding:8px">Outbound integrations</td><td style="text-align:center">None</td><td style="text-align:center">Slack/Teams webhook (customer-approved)</td><td style="text-align:center">Microsoft Graph, SAP, Veeva</td></tr>
+        <tr><td style="padding:8px">Validation pack</td><td style="text-align:center">None</td><td style="text-align:center">Template available</td><td style="text-align:center">GAMP 5 Cat 4 included</td></tr>
+        <tr><td style="padding:8px">Vendor audit docs</td><td style="text-align:center">Available on request</td><td style="text-align:center">SOC 2 Type II (Supabase, Netlify)</td><td style="text-align:center">Customer-led audit supported</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="mt-3">Data handling</h2>
+  <div class="card">
+    <h3>What leaves your browser</h3>
+    <ul class="text-sm text-muted" style="padding-left:20px;line-height:1.8">
+      <li><b>Nothing, in DEV tier.</b> No sync, no analytics, no tracking. The app even works offline.</li>
+      <li><b>AI prompts</b> go to Anthropic Claude via a Netlify Function. Fields classified as Restricted or GMP are redacted before the prompt is built. AI can be disabled entirely in settings.</li>
+      <li><b>Feedback form</b> sends what you type to chris@cotoole.com via Resend. You control the message.</li>
+      <li><b>Share links</b> encode the playbook as a compressed blob in the URL. Only people you send the link to see it.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Sub-processors (TEAM and ENTERPRISE)</h3>
+    <ul class="text-sm text-muted" style="padding-left:20px;line-height:1.8">
+      <li><b>Netlify</b>: static site host + serverless functions. SOC 2 Type II, HIPAA BAA on request.</li>
+      <li><b>Supabase</b>: Postgres, Auth, Storage. SOC 2 Type II, HIPAA BAA on request, self-hostable for ENTERPRISE.</li>
+      <li><b>Anthropic</b>: Claude API. SOC 2 Type II. Enterprise plan offers data-retention controls and zero-retention mode. ENTERPRISE customers can route via Azure OpenAI in-tenant instead.</li>
+      <li><b>Resend</b>: transactional email. Used for feedback and scheduled digests. Optional; can be disabled.</li>
+    </ul>
+  </div>
+
+  <h2 class="mt-3">Corporate IT FAQ</h2>
+  <div class="card">
+    <h3>Does this touch our network?</h3>
+    <p class="text-sm text-muted">In DEV, no. In TEAM and ENTERPRISE, traffic flows over standard HTTPS to the tenant you approve. Firewall rules and DLP apply as normal. No VPN or special ports required.</p>
+  </div>
+  <div class="card">
+    <h3>Can we self-host?</h3>
+    <p class="text-sm text-muted">ENTERPRISE tier supports self-hosted Supabase (Postgres), self-hosted Netlify Edge alternatives (e.g. Cloudflare Workers in your tenant), and Azure OpenAI in your subscription for AI. The codebase is static HTML plus vanilla JS plus a handful of Node serverless functions. No hidden dependencies.</p>
+  </div>
+  <div class="card">
+    <h3>Can we turn AI off?</h3>
+    <p class="text-sm text-muted">Yes. A single config flag disables all AI features. The 10-step workflow works fully without AI. You lose 5 Whys suggestions, Fishbone proposals, and auto-report generation. Everything else persists.</p>
+  </div>
+  <div class="card">
+    <h3>How do we decommission?</h3>
+    <p class="text-sm text-muted">In DEV, clear IndexedDB in the browser. In TEAM/ENTERPRISE, we ship a one-shot export script (Postgres dump + Storage bucket tarball + audit log tarball). You own the data, we don't hold residuals.</p>
+  </div>
+  <div class="card">
+    <h3>What's the patch / release cadence?</h3>
+    <p class="text-sm text-muted">DEV and TEAM: continuous. Every git push auto-deploys. ENTERPRISE: validated releases on a customer-agreed schedule (typically quarterly). Each release comes with regression test evidence, change log, and risk re-assessment.</p>
+  </div>
+
+  <h2 class="mt-3">Known limitations (honest list)</h2>
+  <div class="card">
+    <ul class="text-sm text-muted" style="padding-left:20px;line-height:1.8">
+      <li>No multi-user real-time collaboration in DEV (by design). TEAM adds it via Supabase Realtime.</li>
+      <li>No native mobile app. PWA only. Install to home screen works on iOS and Android.</li>
+      <li>No on-call paging, alerting, or sensor telemetry. Integrate with your existing tools.</li>
+      <li>Current validation pack is template-only. Full GAMP 5 execution happens per-customer in ENTERPRISE.</li>
+      <li>No formal FedRAMP, ISO 27001, or HIPAA self-attestation today. Relies on sub-processor attestations.</li>
+      <li>AI model pinning and performance monitoring are ENTERPRISE-only.</li>
+    </ul>
+  </div>
+
+  <h2 class="mt-3">Request vendor artifacts</h2>
+  <div class="card">
+    <p class="text-sm text-muted mb-2">For CSV, vendor audit, or security review: send the request via the Feedback button in the top nav. We reply within one business day with whichever of the following apply to your tier: architecture diagram, data-flow map, sub-processor list, SOC 2 letters, pen test summary, GAMP 5 pack, IQ/OQ/PQ templates, SBOM, sample DPA.</p>
+    <a class="btn btn-accent" href="index.html">Back to the app</a>
+  </div>
+</div>
+
+<script type="module">
+import { renderTopNav } from '/assets/js/core.js';
+renderTopNav();
+</script>
+</body>
+</html>

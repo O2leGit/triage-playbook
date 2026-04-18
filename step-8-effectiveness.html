@@ -61,9 +61,25 @@
       <label for="evidence_summary">Evidence summary</label>
       <textarea id="evidence_summary" class="textarea" rows="3" placeholder="Scrap $ dropped from $120K to $22K over 30 days. Source: Power BI dashboard."></textarea>
     </div>
-    <div class="field">
-      <label for="signed_by">Signed by (typed name acts as e-signature)</label>
-      <input id="signed_by" class="input" placeholder="Full name" />
+    <div class="two-col">
+      <div class="field">
+        <label for="signed_by">Signer full name</label>
+        <input id="signed_by" class="input" placeholder="First Last" autocomplete="off" />
+      </div>
+      <div class="field" id="esig-wrap" style="display:none">
+        <label for="esig_reason">Reason for signing</label>
+        <select id="esig_reason" class="select">
+          <option value="responsibility">Responsibility for the content</option>
+          <option value="approval">Approval</option>
+          <option value="verification">Verification of effectiveness</option>
+          <option value="authorship">Authorship</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" id="pwd-wrap" style="display:none">
+      <label for="signer_pwd">Session confirmation code (re-entered per 21 CFR 11 intent)</label>
+      <input id="signer_pwd" class="input" type="password" autocomplete="new-password" placeholder="Type any confirmation code not blank" />
+      <span class="hint">In ENTERPRISE this is validated via your SSO second factor.</span>
     </div>
     <button id="add" class="btn btn-accent">Log checkpoint</button>
   </div>
@@ -94,13 +110,20 @@
 
 <script type="module">
 import { requireAuth, renderTopNav, getActivePlaybookId, renderProgress, renderWizardNav, toast, escapeHtml, confirmAction, fmtDate, fmtDateTime } from '/assets/js/core.js';
-import { listEffectiveness, addEffectiveness, updatePlaybook } from '/assets/js/data.js';
+import { listEffectiveness, addEffectiveness, updatePlaybook, loadFullPlaybook } from '/assets/js/data.js';
+import { hasFeature } from '/assets/js/tier.js';
+
+async function sha256(s) { const b = new TextEncoder().encode(s); const h = await crypto.subtle.digest('SHA-256', b); return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
 
 async function boot() {
   await requireAuth(); await renderTopNav(); renderProgress(8);
   const pid = getActivePlaybookId();
   if (!pid) { location.href = 'index.html'; return; }
   document.getElementById('reviewed_at').value = new Date().toISOString().slice(0,10);
+  if (hasFeature('part11_esig')) {
+    document.getElementById('esig-wrap').style.display = '';
+    document.getElementById('pwd-wrap').style.display = '';
+  }
 
   const listEl = document.getElementById('list');
   async function refresh() {
@@ -129,6 +152,15 @@ async function boot() {
     const evidence_summary = document.getElementById('evidence_summary').value.trim();
     if (!evidence_summary) { toast('Evidence summary required', 'err'); return; }
     try {
+      let extra = {};
+      if (hasFeature('part11_esig')) {
+        const reason = document.getElementById('esig_reason').value;
+        const pwd = document.getElementById('signer_pwd').value;
+        if (!pwd) { toast('Session confirmation code required', 'err'); return; }
+        const full = await loadFullPlaybook(pid);
+        const recordHash = await sha256(JSON.stringify({ pid, state: { status: full.playbook.status, updated_at: full.playbook.updated_at, actions: full.corrective.length + full.preventive.length + full.containment.length, metrics: full.metrics.length } }));
+        extra = { esig_reason: reason, record_hash: recordHash, signer_agent: navigator.userAgent.slice(0, 120) };
+      }
       await addEffectiveness(pid, {
         checkpoint: document.getElementById('checkpoint').value,
         reviewed_at,
@@ -136,7 +168,8 @@ async function boot() {
         evidence_summary,
         recommended_action: document.getElementById('recommended_action').value,
         signed_by,
-        signed_at: new Date().toISOString()
+        signed_at: new Date().toISOString(),
+        ...extra
       });
       document.getElementById('signed_by').value = '';
       document.getElementById('evidence_summary').value = '';
