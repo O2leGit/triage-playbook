@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1e35" />
+  <title>Step 1 - Define the problem</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/styles.css" />
+  <script src="/assets/js/config.js"></script>
+</head>
+<body>
+<div class="container-narrow">
+  <div class="step-header">
+    <div class="eyebrow">Phase A - Triage / Step 1 of 10</div>
+    <h1>Define the problem</h1>
+    <p>Severity, impact, and 5W2H. An is/is-not statement forces precision early.</p>
+  </div>
+
+  <details class="why">
+    <summary>Why this matters</summary>
+    <div class="why-body">
+      A problem well-stated is half-solved. 8D starts with problem definition (D0-D2) for a reason: teams that skip this step debate symptoms for hours. The is/is-not framing from Kepner-Tregoe is used by Google SRE for severity triage.
+      <br /><a href="https://asq.org/quality-resources/eight-disciplines-8d" target="_blank" rel="noopener">Source: ASQ 8D</a>
+    </div>
+  </details>
+
+  <form id="form">
+    <div class="card">
+      <div class="field">
+        <label for="title">Short title</label>
+        <input id="title" class="input" required maxlength="140" />
+      </div>
+      <div class="two-col">
+        <div class="field">
+          <label for="severity">Severity</label>
+          <select id="severity" class="select">
+            <option value="P1">P1 - major impact, all hands</option>
+            <option value="P2">P2 - significant impact</option>
+            <option value="P3">P3 - moderate</option>
+            <option value="P4">P4 - minor</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="impact_summary">Impact ($, hours, units)</label>
+          <input id="impact_summary" class="input" placeholder="$120K exposure / 8hr outage" />
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mt-3 mb-1">Project + stakeholders</h3>
+    <p class="text-sm text-muted mb-2">Optional project code and per-project email distribution list. Reports and reminders go here.</p>
+    <div class="card">
+      <div class="two-col">
+        <div class="field"><label for="project_code">Project code</label><input id="project_code" class="input" placeholder="MPLS-2026-04" /></div>
+        <div class="field"><label for="exec_recipient">Exec recipient (single email)</label><input id="exec_recipient" type="email" class="input" placeholder="eric@company.com" /></div>
+      </div>
+      <div class="field">
+        <label for="stakeholder_emails">Stakeholder distribution list (comma-separated)</label>
+        <textarea id="stakeholder_emails" class="textarea" rows="2" placeholder="sam@company.com, cindy@company.com, ryan@company.com"></textarea>
+      </div>
+      <div class="field">
+        <label for="description">Longer description (optional)</label>
+        <textarea id="description" class="textarea" rows="3"></textarea>
+      </div>
+    </div>
+
+    <h3 class="mt-3 mb-1">5W2H</h3>
+    <p class="text-sm text-muted mb-2">Answer briefly. You can refine later. Empty fields are fine for now.</p>
+    <div class="card">
+      <div class="two-col">
+        <div class="field"><label for="what">What happened</label><textarea id="what" class="textarea" rows="2"></textarea></div>
+        <div class="field"><label for="when_started">When started</label><input id="when_started" type="datetime-local" class="input" /></div>
+        <div class="field"><label for="where_location">Where</label><input id="where_location" class="input" placeholder="Line 3 / us-east-1 / clinic A" /></div>
+        <div class="field"><label for="who_detected">Who detected</label><input id="who_detected" class="input" /></div>
+        <div class="field"><label for="how_many">How many / how big</label><input id="how_many" class="input" placeholder="30 batches, 2% of volume" /></div>
+        <div class="field"><label for="how_detected">How detected</label><input id="how_detected" class="input" placeholder="Alert, audit, customer call" /></div>
+      </div>
+    </div>
+
+    <h3 class="mt-3 mb-1">Is / Is-not (Kepner-Tregoe)</h3>
+    <p class="text-sm text-muted mb-2">Narrow the problem by stating what it is and what it specifically is not.</p>
+    <div class="card">
+      <div class="two-col">
+        <div class="field"><label for="is_statement">Is</label><textarea id="is_statement" class="textarea" rows="3" placeholder="Scrap on Line 3 after FEFO override..."></textarea></div>
+        <div class="field"><label for="is_not_statement">Is not</label><textarea id="is_not_statement" class="textarea" rows="3" placeholder="Not on Line 2. Not before the override."></textarea></div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script type="module">
+import { supabase, requireAuth, renderTopNav, getActivePlaybookId, setActivePlaybookId, renderProgress, renderWizardNav, toast } from '/assets/js/core.js';
+import { getPlaybook, updatePlaybook, createPlaybook } from '/assets/js/data.js';
+
+async function boot() {
+  await requireAuth(); await renderTopNav();
+  renderProgress(1);
+
+  let pid = getActivePlaybookId();
+  let pb;
+  if (pid) { try { pb = await getPlaybook(pid); } catch { pid = null; } }
+  if (!pid) {
+    const title = prompt('Short title for this triage?') || 'Untitled triage';
+    pb = await createPlaybook({ title, severity: 'P2' });
+    pid = pb.id; setActivePlaybookId(pid);
+    history.replaceState({}, '', `start.html?pid=${pid}`);
+  }
+
+  // Populate
+  const f = document.getElementById('form');
+  const set = (id, v) => { const el = f.querySelector('#' + id); if (el && v != null) el.value = v; };
+  set('title', pb.title); set('severity', pb.severity || 'P2'); set('impact_summary', pb.impact_summary);
+  set('what', pb.what);
+  if (pb.when_started) { try { set('when_started', new Date(pb.when_started).toISOString().slice(0,16)); } catch {} }
+  set('where_location', pb.where_location); set('who_detected', pb.who_detected);
+  set('how_many', pb.how_many); set('how_detected', pb.how_detected);
+  set('is_statement', pb.is_statement); set('is_not_statement', pb.is_not_statement);
+  set('project_code', pb.project_code); set('exec_recipient', pb.exec_recipient);
+  set('stakeholder_emails', pb.stakeholder_emails); set('description', pb.description);
+
+  const save = async () => {
+    const title = f.querySelector('#title').value.trim();
+    if (!title) throw new Error('Title required');
+    const val = (id) => f.querySelector('#' + id).value.trim() || null;
+    const whenVal = f.querySelector('#when_started').value;
+    await updatePlaybook(pid, {
+      title, severity: val('severity'), impact_summary: val('impact_summary'),
+      what: val('what'),
+      when_started: whenVal ? new Date(whenVal).toISOString() : null,
+      where_location: val('where_location'), who_detected: val('who_detected'),
+      how_many: val('how_many'), how_detected: val('how_detected'),
+      is_statement: val('is_statement'), is_not_statement: val('is_not_statement'),
+      project_code: val('project_code'), exec_recipient: val('exec_recipient'),
+      stakeholder_emails: val('stakeholder_emails'), description: val('description')
+    });
+  };
+
+  // Save on Next click and on manual Save
+  renderWizardNav(1, { onSave: save });
+  document.getElementById('tp-next')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    try { await save(); location.href = e.currentTarget.getAttribute('href'); } catch (err) { toast(err.message || 'Save failed', 'err'); }
+  });
+
+  // Autosave every 20s
+  setInterval(() => { save().catch(() => {}); }, 20000);
+}
+boot();
+</script>
+</body>
+</html>

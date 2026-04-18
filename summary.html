@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1e35" />
+  <title>Summary - Triage Playbook</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/styles.css" />
+  <script src="/assets/js/config.js"></script>
+</head>
+<body>
+<div class="container">
+  <div id="top" class="no-print">
+    <div class="label">Summary + export</div>
+    <h1 id="title" style="margin-top:8px"></h1>
+    <p id="meta" class="text-muted mb-2"></p>
+    <div class="flex gap-1 flex-wrap mb-3">
+      <button id="print-btn" class="btn btn-ghost">Print / PDF</button>
+      <button id="md-btn" class="btn btn-ghost">Download Markdown</button>
+      <button id="report-btn" class="btn btn-accent">Auto-report (Claude)</button>
+      <button id="email-btn" class="btn btn-gold">Email report</button>
+      <a id="back-btn" class="btn btn-ghost" href="index.html">Back to dashboard</a>
+    </div>
+    <div id="ai-output" class="card hidden">
+      <h3>Auto-generated executive report</h3>
+      <p class="text-xs text-muted mb-1">Claude summary, editable. Does not auto-save.</p>
+      <textarea id="ai-text" class="textarea" rows="12"></textarea>
+    </div>
+    <hr class="divider" />
+  </div>
+
+  <div id="body"></div>
+</div>
+
+<!-- Email modal -->
+<dialog id="email-dlg" style="border:none;border-radius:8px;padding:0;max-width:92vw;width:460px">
+  <form method="dialog" style="padding:24px">
+    <h3>Email this report</h3>
+    <div class="field"><label for="to">To (comma-separated)</label><input id="to" class="input" placeholder="eric@company.com, sam@company.com" required /></div>
+    <div class="field"><label for="subject">Subject</label><input id="subject" class="input" /></div>
+    <div class="field"><label><input type="checkbox" id="include-ai" checked /> Include Claude auto-report</label></div>
+    <div class="flex gap-1" style="justify-content:flex-end">
+      <button type="button" id="email-cancel" class="btn btn-ghost">Cancel</button>
+      <button type="submit" id="email-send" class="btn btn-primary">Send</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module">
+import { requireAuth, renderTopNav, getActivePlaybookId, toast, escapeHtml, fmtDate, fmtDateTime } from '/assets/js/core.js';
+import { loadFullPlaybook } from '/assets/js/data.js';
+import { playbookToMarkdown, downloadMarkdown, sendReportEmail } from '/assets/js/export.js';
+import { autoReport } from '/assets/js/ai.js';
+
+let FULL = null;
+
+function render(full) {
+  const p = full.playbook;
+  document.getElementById('title').textContent = p.title;
+  document.getElementById('meta').textContent = `Severity ${p.severity || ''} - ${p.status} - Updated ${fmtDateTime(p.updated_at)}`;
+  const body = document.getElementById('body');
+  body.innerHTML = '';
+
+  const section = (title, inner) => {
+    const el = document.createElement('div'); el.className = 'card';
+    el.innerHTML = `<h3>${title}</h3>` + inner;
+    body.appendChild(el);
+  };
+
+  section('1. Problem', `
+    <p><b>Impact:</b> ${escapeHtml(p.impact_summary || '')}</p>
+    <p class="text-sm text-muted">What: ${escapeHtml(p.what || '')}</p>
+    <p class="text-sm text-muted">When: ${p.when_started ? fmtDateTime(p.when_started) : ''}</p>
+    <p class="text-sm text-muted">Where: ${escapeHtml(p.where_location || '')}</p>
+    <p class="text-sm text-muted">Who detected: ${escapeHtml(p.who_detected || '')}</p>
+    <p class="text-sm text-muted">How many: ${escapeHtml(p.how_many || '')}</p>
+    <p class="text-sm text-muted">How detected: ${escapeHtml(p.how_detected || '')}</p>
+    <p class="text-sm"><b>Is:</b> ${escapeHtml(p.is_statement || '')}</p>
+    <p class="text-sm"><b>Is not:</b> ${escapeHtml(p.is_not_statement || '')}</p>
+  `);
+
+  section('2. Team', full.team.length ? full.team.map(t => `<p class="text-sm"><b>${t.role.replace(/_/g,' ')}:</b> ${escapeHtml(t.name)}${t.email ? ' (' + escapeHtml(t.email) + ')' : ''}</p>`).join('') : '<p class="text-muted text-sm">None recorded.</p>');
+
+  const actList = (arr) => arr.length ? arr.map(a => `<p class="text-sm">[${a.status}] ${escapeHtml(a.description)} - ${escapeHtml(a.owner_name || 'unassigned')} - due ${fmtDate(a.due_date)}</p>`).join('') : '<p class="text-muted text-sm">None.</p>';
+  section('3. Interim containment', actList(full.containment));
+
+  const whys = full.rootCauses.filter(r => r.method === 'five_whys').sort((a,b)=>a.sequence_index-b.sequence_index);
+  const fish = full.rootCauses.filter(r => r.method === 'fishbone');
+  section('4. Root cause',
+    (whys.length ? '<p class="text-sm"><b>5 Whys:</b></p>' + whys.map((w,i)=>`<p class="text-sm">${i+1}. ${escapeHtml(w.statement)}${w.evidence_confirmed ? ' <span class="badge badge-green">confirmed</span>' : ''}</p>`).join('') : '<p class="text-muted text-sm">No 5 Whys.</p>')
+    + (fish.length ? '<p class="text-sm mt-1"><b>Fishbone:</b></p>' + fish.map(f=>`<p class="text-sm">[${f.fishbone_category}] ${escapeHtml(f.statement)}</p>`).join('') : '')
+  );
+
+  section('5. Permanent corrective', actList(full.corrective));
+  section('6. Preventive (escape-point)', actList(full.preventive));
+
+  const g = full.governance || {};
+  section('7. Governance', `
+    <p class="text-sm"><b>Review cadence:</b> ${escapeHtml(g.review_cadence || '')}</p>
+    <p class="text-sm"><b>Escalation rule:</b> ${escapeHtml(g.escalation_rule || '')}</p>
+    <p class="text-sm"><b>Standardize to:</b> ${escapeHtml(g.standardize_to || '')}</p>
+    ${g.blameless_postmortem ? '<p class="text-sm mt-1"><b>Blameless postmortem:</b></p><pre style="white-space:pre-wrap;font:inherit">' + escapeHtml(g.blameless_postmortem) + '</pre>' : ''}
+  `);
+
+  section('8. Metrics', full.metrics.length ? full.metrics.map(m=>`<p class="text-sm"><b>${escapeHtml(m.name)}</b> (${m.indicator_type}) target ${m.target_value ?? ''}, thresholds G≤${m.green_threshold ?? ''} Y≤${m.yellow_threshold ?? ''} R>${m.red_threshold ?? ''}</p>${m.response_plan ? '<p class="text-xs text-muted">Response: '+escapeHtml(m.response_plan)+'</p>' : ''}`).join('') : '<p class="text-muted text-sm">None.</p>');
+
+  section('9. Effectiveness checkpoints', full.effectiveness.length ? full.effectiveness.map(e=>`<p class="text-sm">${e.checkpoint.replace(/_/g,' ')} on ${fmtDate(e.reviewed_at)}: <b>${e.verdict}</b> -> ${e.recommended_action.replace(/_/g,' ')}${e.signed_by ? ' - signed by ' + escapeHtml(e.signed_by) : ''}</p>${e.evidence_summary ? '<p class="text-xs text-muted">Evidence: '+escapeHtml(e.evidence_summary)+'</p>' : ''}`).join('') : '<p class="text-muted text-sm">No checkpoints yet.</p>');
+
+  const last = full.effectiveness[full.effectiveness.length - 1];
+  const loop = !last ? '<p class="text-muted text-sm">Pending effectiveness review.</p>' :
+    (last.verdict === 'effective' ? `<p class="text-sm">Last verdict effective on ${fmtDate(last.reviewed_at)}. No loop-back needed.</p>` : `<p class="text-sm">Recommended: <b>${last.recommended_action.replace(/_/g,' ')}</b> based on <b>${last.verdict}</b> verdict.</p>`);
+  section('10. Loop-back decision', loop);
+
+  section('Evidence / Attachments', full.attachments.length ? full.attachments.map(a=>`<p class="text-sm">${escapeHtml(a.file_name)} (${Math.round((a.size_bytes||0)/1024)} KB) - ${escapeHtml(a.step_slug || 'general')}</p>`).join('') : '<p class="text-muted text-sm">None.</p>');
+}
+
+async function boot() {
+  await requireAuth(); await renderTopNav();
+  const pid = getActivePlaybookId();
+  if (!pid) { location.href = 'index.html'; return; }
+
+  FULL = await loadFullPlaybook(pid);
+  render(FULL);
+
+  document.getElementById('print-btn').addEventListener('click', () => window.print());
+  document.getElementById('md-btn').addEventListener('click', () => {
+    const md = playbookToMarkdown(FULL);
+    downloadMarkdown(md, (FULL.playbook.title || 'triage').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.md');
+  });
+
+  document.getElementById('report-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Generating...';
+    try {
+      const res = await autoReport(FULL);
+      const text = (res.report || res.text || '').trim();
+      if (!text) throw new Error('No report returned');
+      document.getElementById('ai-output').classList.remove('hidden');
+      document.getElementById('ai-text').value = text;
+      toast('Report generated', 'ok');
+    } catch (err) { toast('AI unavailable: ' + err.message, 'err'); }
+    finally { btn.disabled = false; btn.textContent = 'Auto-report (Claude)'; }
+  });
+
+  const dlg = document.getElementById('email-dlg');
+  document.getElementById('email-btn').addEventListener('click', () => {
+    document.getElementById('subject').value = 'Triage report: ' + FULL.playbook.title;
+    const recipients = [FULL.playbook.exec_recipient, FULL.playbook.stakeholder_emails].filter(Boolean).join(', ');
+    document.getElementById('to').value = recipients;
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open','');
+  });
+  document.getElementById('email-cancel').addEventListener('click', (e) => { e.preventDefault(); dlg.close(); });
+  document.getElementById('email-send').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const to = document.getElementById('to').value.trim();
+    if (!to) { toast('Recipient required', 'err'); return; }
+    const subject = document.getElementById('subject').value.trim() || 'Triage report';
+    let md = playbookToMarkdown(FULL);
+    if (document.getElementById('include-ai').checked) {
+      const ai = document.getElementById('ai-text').value.trim();
+      if (ai) md = '## Executive summary (AI-drafted)\n\n' + ai + '\n\n---\n\n' + md;
+    }
+    try {
+      await sendReportEmail({ to, subject, body_md: md, playbook_id: FULL.playbook.id });
+      toast('Sent', 'ok'); dlg.close();
+    } catch (err) { toast('Send failed: ' + err.message, 'err'); }
+  });
+}
+boot();
+</script>
+</body>
+</html>

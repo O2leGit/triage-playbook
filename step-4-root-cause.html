@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1e35" />
+  <title>Step 4 - Root cause</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/styles.css" />
+  <script src="/assets/js/config.js"></script>
+</head>
+<body>
+<div class="container-narrow">
+  <div class="step-header">
+    <div class="eyebrow">Phase B - Root cause / Step 4 of 10</div>
+    <h1>Root cause analysis</h1>
+    <p>5 Whys down. Fishbone across. Confirm with data, not opinion. Claude suggests, you decide.</p>
+  </div>
+
+  <details class="why">
+    <summary>Why this matters</summary>
+    <div class="why-body">
+      CAPA and ISO 9001 require evidence-based root cause. 5 Whys (Toyota) is for linear causal chains. Fishbone (Ishikawa) surfaces parallel contributing factors across Manpower, Method, Machine, Material, Measurement, Environment. Use both.
+      <br /><a href="https://www.thefdagroup.com/blog/definitive-guide-to-capa" target="_blank" rel="noopener">Source: CAPA Definitive Guide</a>
+    </div>
+  </details>
+
+  <h3 class="mt-2 mb-1">5 Whys chain</h3>
+  <p class="text-sm text-muted mb-1">Ask "why" until the cause is actionable. Confirm each why with evidence before the next.</p>
+  <div class="card">
+    <div id="whys"></div>
+    <div class="flex gap-1 flex-wrap mt-2">
+      <button id="add-why" class="btn btn-ghost">+ Add a why</button>
+      <button id="ai-why" class="btn btn-accent">Claude: suggest next why</button>
+    </div>
+  </div>
+
+  <h3 class="mt-3 mb-1">Fishbone branches</h3>
+  <p class="text-sm text-muted mb-1">Tag each contributing factor to one of six categories.</p>
+  <div class="card">
+    <div class="two-col">
+      <div class="field">
+        <label for="fb-cat">Category</label>
+        <select id="fb-cat" class="select">
+          <option value="manpower">Manpower (people)</option>
+          <option value="method">Method (process)</option>
+          <option value="machine">Machine (equipment)</option>
+          <option value="material">Material</option>
+          <option value="measurement">Measurement</option>
+          <option value="environment">Environment</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fb-text">Contributing factor</label>
+        <input id="fb-text" class="input" />
+      </div>
+    </div>
+    <div class="flex gap-1 flex-wrap">
+      <button id="add-fb" class="btn btn-accent">Add branch</button>
+      <button id="ai-fb" class="btn btn-ghost">Claude: suggest fishbone</button>
+    </div>
+    <div id="fb-list" class="mt-2"></div>
+  </div>
+
+  <h3 class="mt-3 mb-1">Evidence</h3>
+  <div class="card">
+    <input type="file" id="file" class="input" multiple />
+    <button id="upload" class="btn btn-ghost mt-1">Upload evidence</button>
+    <div id="files" class="mt-2"></div>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, renderTopNav, getActivePlaybookId, renderProgress, renderWizardNav, toast, escapeHtml, confirmAction } from '/assets/js/core.js';
+import { listRootCauses, addRootCause, updateRootCause, deleteRootCause, getPlaybook, uploadAttachment, listAttachments, getAttachmentUrl, deleteAttachment } from '/assets/js/data.js';
+import { suggestFiveWhys, suggestFishbone } from '/assets/js/ai.js';
+
+async function boot() {
+  await requireAuth(); await renderTopNav(); renderProgress(4);
+  const pid = getActivePlaybookId();
+  if (!pid) { location.href = 'index.html'; return; }
+  const pb = await getPlaybook(pid);
+
+  const whysEl = document.getElementById('whys');
+  const fbEl = document.getElementById('fb-list');
+
+  async function refresh() {
+    const rows = await listRootCauses(pid);
+    const whys = rows.filter(r => r.method === 'five_whys').sort((a,b)=>a.sequence_index-b.sequence_index);
+    const fb = rows.filter(r => r.method === 'fishbone');
+
+    whysEl.innerHTML = '';
+    if (!whys.length) whysEl.innerHTML = '<p class="text-muted text-sm">No whys yet. Start with: why did this happen?</p>';
+    whys.forEach((w, i) => {
+      const el = document.createElement('div'); el.className = 'row';
+      el.innerHTML = `
+        <div class="row-body">
+          <div class="row-meta">Why #${i+1}</div>
+          <input class="input" value="${escapeHtml(w.statement)}" data-edit />
+          <div class="mt-1 flex gap-1 flex-wrap">
+            <label class="text-sm"><input type="checkbox" data-conf ${w.evidence_confirmed ? 'checked' : ''}/> evidence confirmed</label>
+            <button class="btn btn-danger btn-sm" data-del>Remove</button>
+          </div>
+        </div>
+      `;
+      el.querySelector('[data-edit]').addEventListener('change', async (e) => { await updateRootCause(w.id, { statement: e.target.value }, pid); });
+      el.querySelector('[data-conf]').addEventListener('change', async (e) => { await updateRootCause(w.id, { evidence_confirmed: e.target.checked }, pid); toast(e.target.checked ? 'Confirmed' : 'Unconfirmed', 'ok'); });
+      el.querySelector('[data-del]').addEventListener('click', async () => { if (!confirmAction('Remove this why?')) return; await deleteRootCause(w.id, pid); refresh(); });
+      whysEl.appendChild(el);
+    });
+
+    fbEl.innerHTML = '';
+    if (!fb.length) fbEl.innerHTML = '<p class="text-muted text-sm">No fishbone branches yet.</p>';
+    fb.forEach(b => {
+      const el = document.createElement('div'); el.className = 'row';
+      el.innerHTML = `<div class="row-body"><div class="row-title">${escapeHtml(b.statement)} <span class="badge badge-blue">${b.fishbone_category}</span></div></div><button class="btn btn-danger btn-sm" data-del>Remove</button>`;
+      el.querySelector('[data-del]').addEventListener('click', async () => { if (!confirmAction('Remove branch?')) return; await deleteRootCause(b.id, pid); refresh(); });
+      fbEl.appendChild(el);
+    });
+  }
+
+  document.getElementById('add-why').addEventListener('click', async () => {
+    const statement = prompt('Why did this happen?');
+    if (!statement) return;
+    const current = await listRootCauses(pid);
+    const maxSeq = Math.max(-1, ...current.filter(r => r.method === 'five_whys').map(r => r.sequence_index));
+    await addRootCause(pid, { method: 'five_whys', sequence_index: maxSeq + 1, statement });
+    refresh();
+  });
+
+  document.getElementById('ai-why').addEventListener('click', async (e) => {
+    const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Thinking...';
+    try {
+      const current = await listRootCauses(pid);
+      const priorWhys = current.filter(r => r.method === 'five_whys').sort((a,b)=>a.sequence_index-b.sequence_index).map(r => r.statement);
+      const ctx = { title: pb.title, impact: pb.impact_summary, what: pb.what, where: pb.where_location, is: pb.is_statement, is_not: pb.is_not_statement };
+      const res = await suggestFiveWhys(ctx, priorWhys);
+      const s = res.suggestion || (res.text || '').trim();
+      if (!s) throw new Error('No suggestion returned');
+      if (confirmAction('Add this why?\n\n' + s)) {
+        const maxSeq = Math.max(-1, ...priorWhys.map((_,i)=>i));
+        await addRootCause(pid, { method: 'five_whys', sequence_index: maxSeq + 1, statement: s });
+        refresh();
+      }
+    } catch (err) { toast('AI unavailable: ' + err.message, 'err'); }
+    finally { btn.disabled = false; btn.textContent = 'Claude: suggest next why'; }
+  });
+
+  document.getElementById('add-fb').addEventListener('click', async () => {
+    const statement = document.getElementById('fb-text').value.trim();
+    if (!statement) { toast('Enter a factor', 'err'); return; }
+    const fishbone_category = document.getElementById('fb-cat').value;
+    await addRootCause(pid, { method: 'fishbone', fishbone_category, statement });
+    document.getElementById('fb-text').value = '';
+    refresh();
+  });
+
+  document.getElementById('ai-fb').addEventListener('click', async (e) => {
+    const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Thinking...';
+    try {
+      const ctx = { title: pb.title, impact: pb.impact_summary, what: pb.what, where: pb.where_location, is: pb.is_statement, is_not: pb.is_not_statement };
+      const res = await suggestFishbone(ctx);
+      const branches = Array.isArray(res.branches) ? res.branches : [];
+      if (!branches.length) throw new Error('No branches returned');
+      if (confirmAction('Add ' + branches.length + ' fishbone branches from Claude?')) {
+        for (const b of branches) {
+          await addRootCause(pid, { method: 'fishbone', fishbone_category: b.category, statement: b.statement });
+        }
+        refresh();
+      }
+    } catch (err) { toast('AI unavailable: ' + err.message, 'err'); }
+    finally { btn.disabled = false; btn.textContent = 'Claude: suggest fishbone'; }
+  });
+
+  // Attachments
+  const filesEl = document.getElementById('files');
+  async function refreshFiles() {
+    const atts = await listAttachments(pid, 'root_cause');
+    if (!atts.length) { filesEl.innerHTML = '<p class="text-muted text-sm">No evidence yet.</p>'; return; }
+    filesEl.innerHTML = '';
+    for (const a of atts) {
+      const url = await getAttachmentUrl(a.file_path).catch(()=>null);
+      const el = document.createElement('div'); el.className = 'row';
+      el.innerHTML = `<div class="row-body"><div class="row-title">${escapeHtml(a.file_name)}</div><div class="row-meta">${Math.round((a.size_bytes||0)/1024)} KB ${url ? '- <a href="'+url+'" target="_blank">view</a>' : ''}</div></div><button class="btn btn-danger btn-sm">Delete</button>`;
+      el.querySelector('button').addEventListener('click', async () => { if (!confirmAction('Delete?')) return; await deleteAttachment(a); refreshFiles(); });
+      filesEl.appendChild(el);
+    }
+  }
+  document.getElementById('upload').addEventListener('click', async () => {
+    const files = document.getElementById('file').files;
+    if (!files.length) { toast('Pick a file first', 'err'); return; }
+    for (const f of files) { try { await uploadAttachment(pid, f, 'root_cause'); } catch (e) { toast('Upload failed: '+e.message, 'err'); } }
+    toast('Uploaded', 'ok'); document.getElementById('file').value=''; refreshFiles();
+  });
+
+  renderWizardNav(4);
+  refresh(); refreshFiles();
+}
+boot();
+</script>
+</body>
+</html>

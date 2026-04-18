@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1e35" />
+  <title>Step 2 - Form the team</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/styles.css" />
+  <script src="/assets/js/config.js"></script>
+</head>
+<body>
+<div class="container-narrow">
+  <div class="step-header">
+    <div class="eyebrow">Phase A - Triage / Step 2 of 10</div>
+    <h1>Form the team</h1>
+    <p>Clear roles beat big rooms. One incident commander. Analyst for data. Ops lead for the line. Comms for stakeholders.</p>
+  </div>
+
+  <details class="why">
+    <summary>Why this matters</summary>
+    <div class="why-body">
+      Google SRE uses an explicit incident command structure. 8D D1 requires a cross-functional team. The biggest mistake is combining roles: the incident commander should not also be the hands-on-keyboard analyst.
+      <br /><a href="https://sre.google/sre-book/managing-incidents/" target="_blank" rel="noopener">Source: Google SRE - Managing incidents</a>
+    </div>
+  </details>
+
+  <div class="card">
+    <h3>Add a team member</h3>
+    <div class="two-col">
+      <div class="field">
+        <label for="role">Role</label>
+        <select id="role" class="select">
+          <option value="incident_commander">Incident commander</option>
+          <option value="analyst">Analyst (data, RCA)</option>
+          <option value="ops_lead">Ops lead</option>
+          <option value="quality">Quality</option>
+          <option value="comms">Comms / stakeholder liaison</option>
+          <option value="stakeholder">Stakeholder (exec, customer)</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="name">Name</label>
+        <input id="name" class="input" placeholder="Andrew" />
+      </div>
+      <div class="field">
+        <label for="email">Email (for notifications)</label>
+        <input id="email" class="input" type="email" placeholder="andrew@company.com" />
+      </div>
+      <div class="field">
+        <label for="notes">Notes</label>
+        <input id="notes" class="input" placeholder="Owns the scrap risk dashboard" />
+      </div>
+    </div>
+    <button id="add" class="btn btn-accent">Add to team</button>
+  </div>
+
+  <h3 class="mt-3 mb-1">Current team</h3>
+  <div id="list"></div>
+</div>
+
+<script type="module">
+import { supabase, requireAuth, renderTopNav, getActivePlaybookId, renderProgress, renderWizardNav, toast, escapeHtml, confirmAction } from '/assets/js/core.js';
+import { listTeam, addTeam, deleteTeam } from '/assets/js/data.js';
+
+async function boot() {
+  await requireAuth(); await renderTopNav(); renderProgress(2);
+  const pid = getActivePlaybookId();
+  if (!pid) { location.href = 'index.html'; return; }
+
+  const listEl = document.getElementById('list');
+  async function refresh() {
+    const rows = await listTeam(pid);
+    if (!rows.length) { listEl.innerHTML = '<p class="text-muted text-sm">No team members yet.</p>'; return; }
+    listEl.innerHTML = '';
+    for (const r of rows) {
+      const el = document.createElement('div');
+      el.className = 'row';
+      el.innerHTML = `
+        <div class="row-body">
+          <div class="row-title">${escapeHtml(r.name)} <span class="badge badge-blue">${r.role.replace(/_/g,' ')}</span></div>
+          <div class="row-meta">${escapeHtml(r.email || '')}${r.notes ? ' - ' + escapeHtml(r.notes) : ''}</div>
+        </div>
+        <button class="btn btn-danger btn-sm" data-id="${r.id}">Remove</button>
+      `;
+      el.querySelector('button').addEventListener('click', async () => {
+        if (!confirmAction('Remove ' + r.name + '?')) return;
+        await deleteTeam(r.id, pid); refresh();
+      });
+      listEl.appendChild(el);
+    }
+  }
+
+  document.getElementById('add').addEventListener('click', async () => {
+    const role = document.getElementById('role').value;
+    const name = document.getElementById('name').value.trim();
+    if (!name) { toast('Name required', 'err'); return; }
+    const email = document.getElementById('email').value.trim() || null;
+    const notes = document.getElementById('notes').value.trim() || null;
+    try {
+      await addTeam(pid, { role, name, email, notes });
+      document.getElementById('name').value = '';
+      document.getElementById('email').value = '';
+      document.getElementById('notes').value = '';
+      toast('Added', 'ok'); refresh();
+    } catch (e) { toast(e.message, 'err'); }
+  });
+
+  renderWizardNav(2);
+  refresh();
+}
+boot();
+</script>
+</body>
+</html>

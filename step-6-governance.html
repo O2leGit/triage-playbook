@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1e35" />
+  <title>Step 6 - Governance</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/styles.css" />
+  <script src="/assets/js/config.js"></script>
+</head>
+<body>
+<div class="container-narrow">
+  <div class="step-header">
+    <div class="eyebrow">Phase D - Governance / Step 6 of 10</div>
+    <h1>Governance + blameless postmortem</h1>
+    <p>Review cadence, escalation rule, RACI, blameless postmortem, standardize the new way.</p>
+  </div>
+
+  <details class="why">
+    <summary>Why this matters</summary>
+    <div class="why-body">
+      Google SRE's blameless postmortem culture makes it safe to surface systemic issues. CAPA governance requires aging limits and independent approval. Without governance, fixes decay.
+      <br /><a href="https://sre.google/workbook/postmortem-culture/" target="_blank" rel="noopener">Source: Google SRE Postmortem Culture</a>
+    </div>
+  </details>
+
+  <div class="card">
+    <div class="two-col">
+      <div class="field">
+        <label for="review_cadence">Review cadence</label>
+        <select id="review_cadence" class="select">
+          <option value="">Select</option>
+          <option value="daily">Daily standup</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Bi-weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="escalation_rule">Escalation rule</label>
+        <input id="escalation_rule" class="input" placeholder="If no action progress in 48hr, escalate to VP Ops" />
+      </div>
+    </div>
+    <div class="field">
+      <label for="raci">RACI (Responsible, Accountable, Consulted, Informed)</label>
+      <textarea id="raci" class="textarea" rows="4" placeholder="Responsible: Andrew&#10;Accountable: Eric&#10;Consulted: Quality, Planning&#10;Informed: Finance, Sam"></textarea>
+    </div>
+    <div class="field">
+      <label for="standardize_to">Standardize to (what becomes the new normal?)</label>
+      <textarea id="standardize_to" class="textarea" rows="2" placeholder="New FEFO compliance check added to daily huddle. PO liability page now monthly reviewed by buyers."></textarea>
+    </div>
+  </div>
+
+  <h3 class="mt-3 mb-1">Blameless postmortem</h3>
+  <p class="text-sm text-muted mb-1">Focus on systems, not blame. Claude can draft an initial version from your playbook so far.</p>
+  <div class="card">
+    <textarea id="postmortem" class="textarea" rows="10" placeholder="Summary, timeline, contributing factors, what went well, what could improve, action items..."></textarea>
+    <div class="flex gap-1 flex-wrap mt-1">
+      <button id="save-gov" class="btn btn-accent">Save governance</button>
+      <button id="ai-pm" class="btn btn-ghost">Claude: draft postmortem</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, renderTopNav, getActivePlaybookId, renderProgress, renderWizardNav, toast } from '/assets/js/core.js';
+import { getGovernance, upsertGovernance, loadFullPlaybook } from '/assets/js/data.js';
+import { draftPostmortem } from '/assets/js/ai.js';
+
+async function boot() {
+  await requireAuth(); await renderTopNav(); renderProgress(6);
+  const pid = getActivePlaybookId();
+  if (!pid) { location.href = 'index.html'; return; }
+
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+  const gov = await getGovernance(pid);
+  if (gov) {
+    set('review_cadence', gov.review_cadence);
+    set('escalation_rule', gov.escalation_rule);
+    set('raci', gov.raci_json ? (typeof gov.raci_json === 'string' ? gov.raci_json : JSON.stringify(gov.raci_json, null, 2)) : '');
+    set('standardize_to', gov.standardize_to);
+    set('postmortem', gov.blameless_postmortem);
+  }
+
+  async function save() {
+    await upsertGovernance(pid, {
+      review_cadence: document.getElementById('review_cadence').value || null,
+      escalation_rule: document.getElementById('escalation_rule').value.trim() || null,
+      raci_json: document.getElementById('raci').value.trim() || null,
+      standardize_to: document.getElementById('standardize_to').value.trim() || null,
+      blameless_postmortem: document.getElementById('postmortem').value.trim() || null
+    });
+  }
+  document.getElementById('save-gov').addEventListener('click', async () => { try { await save(); toast('Saved', 'ok'); } catch (e) { toast(e.message, 'err'); } });
+
+  document.getElementById('ai-pm').addEventListener('click', async (e) => {
+    const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Drafting...';
+    try {
+      const full = await loadFullPlaybook(pid);
+      const res = await draftPostmortem(full);
+      const draft = (res.draft || res.text || '').trim();
+      if (!draft) throw new Error('No draft returned');
+      document.getElementById('postmortem').value = draft;
+      toast('Draft loaded. Edit before saving.', 'ok');
+    } catch (err) { toast('AI unavailable: ' + err.message, 'err'); }
+    finally { btn.disabled = false; btn.textContent = 'Claude: draft postmortem'; }
+  });
+
+  renderWizardNav(6, { onSave: save });
+}
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1e35" />
+  <title>Triage Playbook - World-class operational triage and stability</title>
+  <meta name="description" content="Guide any operator through a 10-step triage, containment, root cause, action plan, governance, monitoring, and effectiveness verification. Built on 8D, A3, DMAIC, SRE, ITIL, CAPA, and PDCA." />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/styles.css" />
+  <script src="/assets/js/config.js"></script>
+</head>
+<body>
+<div id="auth-screen" class="hidden">
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="label">Operational triage and stability</div>
+      <h1>Guide any operator from first alarm to <em>sustained fix</em>.</h1>
+      <p class="subtitle">A 10-step playbook built on 8D, A3, DMAIC, SRE, ITIL, CAPA, and PDCA. Triage in hours. Verify in weeks. Loop back if metrics do not move.</p>
+    </div>
+  </section>
+  <div class="auth-card">
+    <h1>Sign in</h1>
+    <p>We will email you a magic link. No password.</p>
+    <form id="magic-form">
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" class="input" type="email" autocomplete="email" required placeholder="you@company.com" />
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%">Send magic link</button>
+    </form>
+    <hr class="divider" />
+    <p class="text-sm text-muted">Curious first? <a href="playbook.html">Read the method</a>.</p>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="label">Your triage dashboard</div>
+      <h1>Every fire, one <em>repeatable</em> method.</h1>
+      <p class="subtitle">Start a new triage or resume one in flight. Every playbook is cloud-synced, mobile-friendly, and audit-trailed.</p>
+      <div class="flex gap-1 flex-wrap" style="margin-top:24px">
+        <button id="new-btn" class="btn btn-gold">Start a new triage</button>
+        <a href="playbook.html" class="btn btn-ghost" style="background:rgba(248,246,241,0.08); color:var(--white); border-color:rgba(248,246,241,0.18)">How it works</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="container">
+    <h2>Portfolio analytics</h2>
+    <p class="text-muted mb-2">Your triage portfolio at a glance. Drill into any playbook below.</p>
+    <div id="kpi-row" class="card-grid" style="margin-bottom:24px"></div>
+
+    <h2>Active playbooks</h2>
+    <p class="text-muted mb-3">Most recently updated first. Filter by status, severity, or project code.</p>
+    <div class="card" style="margin-bottom:14px">
+      <div class="two-col">
+        <div class="field"><label for="filter-q">Search (title, project, impact)</label><input id="filter-q" class="input" placeholder="e.g. scrap, MPLS, P1" /></div>
+        <div class="field"><label for="filter-status">Status</label>
+          <select id="filter-status" class="select">
+            <option value="">All</option>
+            <option value="active">Active</option>
+            <option value="verifying">Verifying</option>
+            <option value="closed">Closed</option>
+            <option value="reopened">Re-opened</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="pb-list" class="card-grid"></div>
+    <div id="empty" class="card hidden text-center">
+      <h3>No triages yet</h3>
+      <p class="text-muted mb-2">The first time something breaks, start a triage. You will thank yourself 30 days later.</p>
+      <button id="empty-new" class="btn btn-accent">Start your first triage</button>
+    </div>
+  </div>
+</div>
+
+<!-- New-triage modal -->
+<dialog id="new-dialog" style="border:none;border-radius:8px;padding:0;max-width:92vw;width:460px">
+  <form method="dialog" style="padding:24px">
+    <h3>Start a new triage</h3>
+    <p class="text-muted text-sm mb-2">You can edit everything later. Capture the essentials now.</p>
+    <div class="field">
+      <label for="t-title">What broke? (short title)</label>
+      <input id="t-title" class="input" required maxlength="140" placeholder="Scrap spike on Line 3" />
+    </div>
+    <div class="two-col">
+      <div class="field">
+        <label for="t-sev">Severity</label>
+        <select id="t-sev" class="select">
+          <option value="P1">P1 - major impact, all hands</option>
+          <option value="P2" selected>P2 - significant impact</option>
+          <option value="P3">P3 - moderate</option>
+          <option value="P4">P4 - minor</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="t-impact">Impact (optional)</label>
+        <input id="t-impact" class="input" placeholder="$120K exposure / 8hr outage" />
+      </div>
+    </div>
+    <div class="flex gap-1" style="justify-content:flex-end;margin-top:12px">
+      <button type="button" id="cancel-new" class="btn btn-ghost">Cancel</button>
+      <button type="submit" id="confirm-new" class="btn btn-primary">Create and go to Step 1</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module">
+import { supabase, toast, renderTopNav, setActivePlaybookId, escapeHtml, fmtDateTime, confirmAction, sendMagicLink } from '/assets/js/core.js';
+import { createPlaybook, listPlaybooks, deletePlaybook } from '/assets/js/data.js';
+import { detectDuplicates } from '/assets/js/ai.js';
+
+async function boot() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) showAuth(); else showApp();
+  supabase.auth.onAuthStateChange((_ev, s) => { if (s) showApp(); else showAuth(); });
+}
+
+function showAuth() {
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+  const form = document.getElementById('magic-form');
+  if (!form.dataset.bound) {
+    form.dataset.bound = '1';
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      try { await sendMagicLink(email); toast('Check your email for a magic link', 'ok'); }
+      catch (err) { toast('Error: ' + err.message, 'err'); }
+    });
+  }
+}
+
+async function showApp() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  await renderTopNav();
+  await loadList();
+  bindNew();
+}
+
+let ALL_ROWS = [];
+
+function renderKpis(rows) {
+  const host = document.getElementById('kpi-row');
+  const open = rows.filter(r => r.status !== 'closed').length;
+  const closed = rows.filter(r => r.status === 'closed');
+  const mttrHours = closed.map(r => (new Date(r.closed_at) - new Date(r.created_at)) / 36e5).filter(h => h > 0);
+  const avgMttr = mttrHours.length ? (mttrHours.reduce((a,b)=>a+b,0) / mttrHours.length).toFixed(1) : null;
+  const p1p2 = rows.filter(r => (r.severity === 'P1' || r.severity === 'P2') && r.status !== 'closed').length;
+  const reopened = rows.filter(r => r.status === 'reopened').length;
+  host.innerHTML = `
+    <div class="card"><div class="label">Open</div><h3 style="font-size:36px;margin-top:8px">${open}</h3><p class="text-xs text-muted">${p1p2} are P1 or P2</p></div>
+    <div class="card"><div class="label">Closed</div><h3 style="font-size:36px;margin-top:8px">${closed.length}</h3><p class="text-xs text-muted">${reopened} re-opened for loop-back</p></div>
+    <div class="card"><div class="label">Avg MTTR</div><h3 style="font-size:36px;margin-top:8px">${avgMttr ? avgMttr + 'h' : '—'}</h3><p class="text-xs text-muted">Mean time from open to close</p></div>
+  `;
+}
+
+function applyFilters() {
+  const q = (document.getElementById('filter-q')?.value || '').toLowerCase();
+  const s = document.getElementById('filter-status')?.value || '';
+  let rows = ALL_ROWS;
+  if (q) rows = rows.filter(r => (r.title + ' ' + (r.project_code||'') + ' ' + (r.impact_summary||'') + ' ' + (r.severity||'')).toLowerCase().includes(q));
+  if (s) rows = rows.filter(r => r.status === s);
+  const host = document.getElementById('pb-list');
+  host.innerHTML = '';
+  const empty = document.getElementById('empty');
+  if (!rows.length) { empty.classList.remove('hidden'); return; } else empty.classList.add('hidden');
+  for (const r of rows) host.appendChild(renderRow(r));
+}
+
+async function loadList() {
+  const host = document.getElementById('pb-list');
+  host.innerHTML = '<div class="skeleton" style="height:120px"></div>';
+  try {
+    ALL_ROWS = await listPlaybooks();
+    renderKpis(ALL_ROWS);
+    if (!ALL_ROWS.length) { host.innerHTML = ''; document.getElementById('empty').classList.remove('hidden'); renderKpis([]); return; }
+    document.getElementById('empty').classList.add('hidden');
+    applyFilters();
+    const qi = document.getElementById('filter-q'); const si = document.getElementById('filter-status');
+    if (qi && !qi.dataset.bound) { qi.dataset.bound = '1'; qi.addEventListener('input', applyFilters); }
+    if (si && !si.dataset.bound) { si.dataset.bound = '1'; si.addEventListener('change', applyFilters); }
+  } catch (e) { host.innerHTML = ''; toast('Load failed: ' + e.message, 'err'); }
+}
+
+function statusBadge(s) {
+  const map = { active: 'gold', verifying: 'blue', closed: 'green', reopened: 'red' };
+  return `<span class="badge badge-${map[s] || 'gray'}">${s}</span>`;
+}
+function sevBadge(s) {
+  const map = { P1: 'red', P2: 'gold', P3: 'blue', P4: 'gray' };
+  return s ? `<span class="badge badge-${map[s]}">${s}</span>` : '';
+}
+
+function renderRow(r) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML = `
+    <div class="flex" style="justify-content:space-between;gap:8px;align-items:flex-start">
+      <h3 style="flex:1;word-break:break-word">${escapeHtml(r.title)}</h3>
+      <div class="flex gap-1">${sevBadge(r.severity)} ${statusBadge(r.status)}</div>
+    </div>
+    <div class="meta">Updated ${fmtDateTime(r.updated_at)}</div>
+    ${r.impact_summary ? `<p class="text-sm" style="margin-bottom:12px">${escapeHtml(r.impact_summary)}</p>` : ''}
+    <div class="flex gap-1 flex-wrap">
+      <a class="btn btn-accent btn-sm" href="start.html?pid=${r.id}">Resume</a>
+      <a class="btn btn-ghost btn-sm" href="summary.html?pid=${r.id}">Summary</a>
+      <button class="btn btn-danger btn-sm" data-del="${r.id}">Delete</button>
+    </div>
+  `;
+  el.querySelector('[data-del]').addEventListener('click', async () => {
+    if (!confirmAction(`Delete "${r.title}"? This cannot be undone.`)) return;
+    try { await deletePlaybook(r.id); toast('Deleted', 'ok'); loadList(); }
+    catch (e) { toast('Delete failed: ' + e.message, 'err'); }
+  });
+  return el;
+}
+
+function bindNew() {
+  const dlg = document.getElementById('new-dialog');
+  const open = () => { if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', ''); };
+  document.getElementById('new-btn').addEventListener('click', open);
+  document.getElementById('empty-new').addEventListener('click', open);
+  document.getElementById('cancel-new').addEventListener('click', (e) => { e.preventDefault(); dlg.close(); });
+  document.getElementById('confirm-new').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const title = document.getElementById('t-title').value.trim();
+    if (!title) { toast('Title required', 'err'); return; }
+    const severity = document.getElementById('t-sev').value;
+    const impact_summary = document.getElementById('t-impact').value.trim();
+    try {
+      // Before creating, scan existing for repeat issues
+      if (ALL_ROWS.length) {
+        try {
+          const { matches } = await detectDuplicates(title, impact_summary, ALL_ROWS.map(r => ({ id: r.id, title: r.title, impact_summary: r.impact_summary })));
+          if (matches && matches.length) {
+            const top = matches[0];
+            const msg = `Possible repeat issue detected (confidence ${(top.confidence*100|0)}%):\n\n${top.reason}\n\nContinue creating a new playbook anyway?`;
+            if (!confirmAction(msg)) return;
+          }
+        } catch { /* AI optional */ }
+      }
+      const pb = await createPlaybook({ title, severity, impact_summary });
+      setActivePlaybookId(pb.id);
+      location.href = `start.html?pid=${pb.id}`;
+    } catch (err) { toast('Create failed: ' + err.message, 'err'); }
+  });
+}
+
+boot();
+</script>
+</body>
+</html>

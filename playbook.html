@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1e35" />
+  <title>The Method - Triage Playbook</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/styles.css" />
+  <script src="/assets/js/config.js"></script>
+</head>
+<body>
+<section class="hero">
+  <div class="hero-inner">
+    <div class="label">The method</div>
+    <h1>Ten steps. Seven <em>world-class</em> standards.</h1>
+    <p class="subtitle">Synthesized from 8D (Ford), A3 (Toyota), DMAIC (Six Sigma), Google SRE, ITIL 4, CAPA (FDA 21 CFR 820.100 / ISO 9001), and PDCA (Deming). Industry-agnostic by design.</p>
+    <div class="flex gap-1 flex-wrap" style="margin-top:20px">
+      <a href="index.html" class="btn btn-gold">Start a triage</a>
+      <a href="#sources" class="btn btn-ghost" style="background:rgba(248,246,241,0.08); color:var(--white); border-color:rgba(248,246,241,0.18)">See the sources</a>
+    </div>
+  </div>
+</section>
+
+<div class="container-narrow">
+  <h2 id="framework">The 10-step framework</h2>
+  <p class="text-muted mb-3">Every step maps to at least two world-class standards. Short-term triage lives in steps 1-3. Long-term stability lives in steps 5-10. The loop-back at step 10 is what separates good teams from world-class ones.</p>
+
+  <div class="card">
+    <div class="label">Phase A - Triage (0-24 hours)</div>
+    <h3>1. Define the problem</h3>
+    <p class="text-muted">Severity, impact, 5W2H, is/is-not. A problem well-stated is half-solved.</p>
+    <p class="text-xs mono" style="color:var(--accent);margin-top:8px">8D D0-D2, SRE severity triage, A3 background</p>
+  </div>
+  <div class="card">
+    <div class="label">Phase A - Triage</div>
+    <h3>2. Form the team</h3>
+    <p class="text-muted">Incident commander, analyst, ops lead, quality, comms, stakeholders. Clear roles beat big rooms.</p>
+    <p class="text-xs mono" style="color:var(--accent);margin-top:8px">8D D1, SRE incident command</p>
+  </div>
+  <div class="card">
+    <div class="label">Phase A - Triage</div>
+    <h3>3. Interim containment</h3>
+    <p class="text-muted">Stop the bleeding. Reversible. Timestamped. Explicitly not a permanent fix.</p>
+    <p class="text-xs mono" style="color:var(--accent);margin-top:8px">8D D3, ITIL incident management</p>
+  </div>
+  <div class="card">
+    <div class="label">Phase B - Root cause</div>
+    <h3>4. Data-driven root cause</h3>
+    <p class="text-muted">5 Whys chain plus Fishbone (manpower, method, machine, material, measurement, environment). Confirm with data, not opinion.</p>
+    <p class="text-xs mono" style="color:var(--accent);margin-top:8px">A3 RCA, 8D D4, CAPA</p>
+  </div>
+  <div class="card">
+    <div class="label">Phase C - Long-term action plan</div>
+    <h3>5. Permanent corrective actions</h3>
+    <p class="text-muted">One action per confirmed root cause. Owner, due date, reversibility flagged.</p>
+    <p class="text-xs mono" style="color:var(--accent);margin-top:8px">8D D5/D6, A3 countermeasures</p>
+  </div>
+  <div class="card">
+    <div class="label">Phase C - Long-term action plan</div>
+    <h3>6. Preventive actions (escape-point fix)</h3>
+    <p class="text-muted">Why did our system let this leak? Preventive actions fix the hole in detection, not the original fault.</p>
+    <p class="text-xs mono" style="color:var(--accent);margin-top:8px">8D D7, CAPA preventive, ITIL problem management</p>
+  </div>
+  <div class="card">
+    <div class="label">Phase D - Governance</div>
+    <h3>7. Governance, RACI, and blameless postmortem</h3>
+    <p class="text-muted">Ownership, escalation rules, review cadence, postmortem template, and standardize the new way.</p>
+    <p class="text-xs mono" style="color:var(--accent);margin-top:8px">SRE postmortem culture, CAPA governance</p>
+  </div>
+  <div class="card">
+    <div class="label">Phase E - Monitoring</div>
+    <h3>8. Metrics, thresholds, and response plan</h3>
+    <p class="text-muted">Leading and lagging indicators. Red, yellow, green thresholds. Response plan for out-of-control signals.</p>
+    <p class="text-xs mono" style="color:var(--accent);margin-top:8px">DMAIC Control, SPC, lead/lag indicators</p>
+  </div>
+  <div class="card">
+    <div class="label">Phase F - Effectiveness</div>
+    <h3>9. 30/60/90 day verification</h3>
+    <p class="text-muted">Close the CAPA only with evidence. Pre-defined success criteria. Electronic signature on sign-off.</p>
+    <p class="text-xs mono" style="color:var(--accent);margin-top:8px">CAPA closure, PDCA Check</p>
+  </div>
+  <div class="card">
+    <div class="label">Phase G - Loop-back</div>
+    <h3>10. Re-triage if metrics do not move</h3>
+    <p class="text-muted">Ask three questions: was the root cause wrong, was the countermeasure inadequate, or did execution fail? Re-enter at the weakest link.</p>
+    <p class="text-xs mono" style="color:var(--accent);margin-top:8px">PDCA Act, A3 iteration</p>
+  </div>
+
+  <hr class="divider" />
+  <h2 id="sources">Expert sources</h2>
+  <p class="text-muted mb-2">Every step cites at least one of the following. Every citation is clickable.</p>
+  <div class="card-grid">
+    <div class="card"><h3>8D Problem Solving</h3><p class="text-sm">Ford's eight disciplines. Explicit separation of interim containment from permanent corrective and preventive.</p><a class="mono text-xs" target="_blank" rel="noopener" href="https://asq.org/quality-resources/eight-disciplines-8d">ASQ 8D</a> / <a class="mono text-xs" target="_blank" rel="noopener" href="https://quality-one.com/8d/">Quality-One</a></div>
+    <div class="card"><h3>A3 Problem Solving</h3><p class="text-sm">Toyota's single-page PDCA method. Iterative by design.</p><a class="mono text-xs" target="_blank" rel="noopener" href="https://www.lean.org/lexicon-terms/a3-report/">Lean Enterprise Institute</a></div>
+    <div class="card"><h3>DMAIC / Six Sigma</h3><p class="text-sm">Control phase is the gold standard for "did it stay fixed."</p><a class="mono text-xs" target="_blank" rel="noopener" href="https://asq.org/quality-resources/dmaic">ASQ DMAIC</a> / <a class="mono text-xs" target="_blank" rel="noopener" href="https://sixsigmadsi.com/what-is-a-six-sigma-control-plan/">Control Plan</a></div>
+    <div class="card"><h3>Google SRE</h3><p class="text-sm">Incident command roles. Blameless postmortem culture. Severity triage.</p><a class="mono text-xs" target="_blank" rel="noopener" href="https://sre.google/sre-book/managing-incidents/">Managing incidents</a> / <a class="mono text-xs" target="_blank" rel="noopener" href="https://sre.google/workbook/postmortem-culture/">Postmortem culture</a></div>
+    <div class="card"><h3>ITIL 4</h3><p class="text-sm">Incident (restore service) vs Problem (remove the cause). MTTA, MTTR, MTBF.</p><a class="mono text-xs" target="_blank" rel="noopener" href="https://www.itil.org.uk/blog/incident-management-vs-problem-management">ITIL incident vs problem</a></div>
+    <div class="card"><h3>CAPA (FDA / ISO 9001)</h3><p class="text-sm">Regulated corrective and preventive action. Evidence-based closure. Aging limits and escalation.</p><a class="mono text-xs" target="_blank" rel="noopener" href="https://www.thefdagroup.com/blog/definitive-guide-to-capa">FDA Group guide</a> / <a class="mono text-xs" target="_blank" rel="noopener" href="https://www.scilife.io/blog/corrective-and-preventive-actions-phases">Scilife phases</a></div>
+    <div class="card"><h3>PDCA (Deming)</h3><p class="text-sm">Plan, Do, Check, Act. The Check phase either standardizes or re-enters Plan. Your loop-back mechanism.</p><a class="mono text-xs" target="_blank" rel="noopener" href="https://www.lean.org/lexicon-terms/pdca/">LEI PDCA</a> / <a class="mono text-xs" target="_blank" rel="noopener" href="https://asq.org/quality-resources/pdca-cycle">ASQ PDCA</a></div>
+    <div class="card"><h3>Leading vs Lagging Indicators</h3><p class="text-sm">Dashboards need both. SPC trend and zone detection turn monitoring into a leading system.</p><a class="mono text-xs" target="_blank" rel="noopener" href="https://www.boc-group.com/en/blog/bpm/leading-and-lagging-indicators-in-process-performance/">BOC Group</a></div>
+  </div>
+</div>
+
+<script type="module">
+import { renderTopNav } from '/assets/js/core.js';
+renderTopNav();
+</script>
+</body>
+</html>

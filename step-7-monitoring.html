@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1e35" />
+  <title>Step 7 - Monitoring and metrics</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/styles.css" />
+  <script src="/assets/js/config.js"></script>
+</head>
+<body>
+<div class="container-narrow">
+  <div class="step-header">
+    <div class="eyebrow">Phase E - Monitoring / Step 7 of 10</div>
+    <h1>Metrics, thresholds, response plan</h1>
+    <p>Leading and lagging. Red, yellow, green thresholds. What to do when a metric goes out of control.</p>
+  </div>
+
+  <details class="why">
+    <summary>Why this matters</summary>
+    <div class="why-body">
+      DMAIC Control phase requires a control plan: measurement, sampling, control chart, response plan when out of limits. Leading indicators predict. Lagging indicators confirm. You need both.
+      <br /><a href="https://sixsigmadsi.com/what-is-a-six-sigma-control-plan/" target="_blank" rel="noopener">Source: Six Sigma Control Plan</a>
+    </div>
+  </details>
+
+  <div class="card">
+    <h3>Add a metric</h3>
+    <div class="two-col">
+      <div class="field">
+        <label for="name">Name</label>
+        <input id="name" class="input" placeholder="Weekly scrap $ on Line 3" />
+      </div>
+      <div class="field">
+        <label for="indicator_type">Type</label>
+        <select id="indicator_type" class="select">
+          <option value="lagging">Lagging (confirms past)</option>
+          <option value="leading">Leading (predicts future)</option>
+        </select>
+      </div>
+      <div class="field"><label for="unit">Unit</label><input id="unit" class="input" placeholder="$, %, count" /></div>
+      <div class="field"><label for="target_value">Target</label><input id="target_value" type="number" step="any" class="input" /></div>
+      <div class="field"><label for="green_threshold">Green ≤</label><input id="green_threshold" type="number" step="any" class="input" /></div>
+      <div class="field"><label for="yellow_threshold">Yellow ≤</label><input id="yellow_threshold" type="number" step="any" class="input" /></div>
+      <div class="field"><label for="red_threshold">Red ></label><input id="red_threshold" type="number" step="any" class="input" /></div>
+      <div class="field"><label for="data_source">Data source</label><input id="data_source" class="input" placeholder="Power BI dashboard, ERP query" /></div>
+    </div>
+    <div class="field">
+      <label for="response_plan">Response plan when red</label>
+      <textarea id="response_plan" class="textarea" rows="2" placeholder="Escalate to Eric within 24hr, convene a mini war-room, re-enter Step 4 if root cause was wrong."></textarea>
+    </div>
+    <button id="add" class="btn btn-accent">Add metric</button>
+  </div>
+
+  <h3 class="mt-3 mb-1">Metrics</h3>
+  <div id="list"></div>
+</div>
+
+<script type="module">
+import { requireAuth, renderTopNav, getActivePlaybookId, renderProgress, renderWizardNav, toast, escapeHtml, confirmAction, fmtDate } from '/assets/js/core.js';
+import { listMetrics, addMetric, deleteMetric, addReading, listReadings } from '/assets/js/data.js';
+
+async function boot() {
+  await requireAuth(); await renderTopNav(); renderProgress(7);
+  const pid = getActivePlaybookId();
+  if (!pid) { location.href = 'index.html'; return; }
+
+  const listEl = document.getElementById('list');
+
+  function classify(value, m) {
+    if (value == null || isNaN(value)) return null;
+    if (m.green_threshold != null && value <= +m.green_threshold) return 'green';
+    if (m.yellow_threshold != null && value <= +m.yellow_threshold) return 'yellow';
+    return 'red';
+  }
+
+  async function refresh() {
+    const rows = await listMetrics(pid);
+    if (!rows.length) { listEl.innerHTML = '<p class="text-muted text-sm">No metrics yet.</p>'; return; }
+    listEl.innerHTML = '';
+    for (const r of rows) {
+      const readings = await listReadings(r.id);
+      const last = readings[readings.length - 1];
+      const lastStatus = last ? (last.status || classify(+last.value, r)) : null;
+      const el = document.createElement('div'); el.className = 'row';
+      el.innerHTML = `
+        <div class="row-body">
+          <div class="row-title">${escapeHtml(r.name)} <span class="badge badge-${r.indicator_type === 'leading' ? 'blue' : 'gold'}">${r.indicator_type}</span>${lastStatus ? ` <span class="status-dot ${lastStatus}"></span>` : ''}</div>
+          <div class="row-meta">Unit: ${escapeHtml(r.unit || '')} - Target: ${r.target_value ?? ''} - G≤${r.green_threshold ?? ''} / Y≤${r.yellow_threshold ?? ''} / R>${r.red_threshold ?? ''} - Source: ${escapeHtml(r.data_source || '')}</div>
+          ${r.response_plan ? `<div class="text-sm" style="margin-top:6px;color:var(--muted)">Response: ${escapeHtml(r.response_plan)}</div>` : ''}
+          <div class="mt-1 flex gap-1 flex-wrap">
+            <input type="date" class="input" style="width:auto;min-height:36px;padding:4px 8px" data-d value="${new Date().toISOString().slice(0,10)}">
+            <input type="number" step="any" class="input" style="width:120px;min-height:36px;padding:4px 8px" data-v placeholder="reading" />
+            <button class="btn btn-accent btn-sm" data-add>Log reading</button>
+            <button class="btn btn-danger btn-sm" data-del>Remove metric</button>
+          </div>
+          <div class="mt-1 text-sm" data-history></div>
+        </div>
+      `;
+      el.querySelector('[data-add]').addEventListener('click', async () => {
+        const v = parseFloat(el.querySelector('[data-v]').value);
+        const d = el.querySelector('[data-d]').value;
+        if (isNaN(v)) { toast('Numeric reading required', 'err'); return; }
+        const status = classify(v, r);
+        try { await addReading(r.id, d, v, status, null, pid); toast('Logged', 'ok'); refresh(); } catch (e) { toast(e.message, 'err'); }
+      });
+      el.querySelector('[data-del]').addEventListener('click', async () => {
+        if (!confirmAction('Remove metric and its readings?')) return;
+        await deleteMetric(r.id, pid); refresh();
+      });
+      const histEl = el.querySelector('[data-history]');
+      histEl.innerHTML = readings.slice(-8).map(rd => `${fmtDate(rd.reading_at)}: ${rd.value}${rd.status ? ' <span class="status-dot '+rd.status+'"></span>' : ''}`).join(' - ');
+      listEl.appendChild(el);
+    }
+  }
+
+  document.getElementById('add').addEventListener('click', async () => {
+    const name = document.getElementById('name').value.trim();
+    if (!name) { toast('Name required', 'err'); return; }
+    const num = (id) => { const v = document.getElementById(id).value; return v === '' ? null : +v; };
+    try {
+      await addMetric(pid, {
+        name,
+        indicator_type: document.getElementById('indicator_type').value,
+        unit: document.getElementById('unit').value.trim() || null,
+        target_value: num('target_value'),
+        green_threshold: num('green_threshold'),
+        yellow_threshold: num('yellow_threshold'),
+        red_threshold: num('red_threshold'),
+        data_source: document.getElementById('data_source').value.trim() || null,
+        response_plan: document.getElementById('response_plan').value.trim() || null
+      });
+      ['name','unit','target_value','green_threshold','yellow_threshold','red_threshold','data_source','response_plan'].forEach(id => document.getElementById(id).value = '');
+      toast('Added', 'ok'); refresh();
+    } catch (e) { toast(e.message, 'err'); }
+  });
+
+  renderWizardNav(7);
+  refresh();
+}
+boot();
+</script>
+</body>
+</html>

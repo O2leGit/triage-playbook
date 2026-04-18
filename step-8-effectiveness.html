@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1e35" />
+  <title>Step 8 - Effectiveness + loop-back</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/styles.css" />
+  <script src="/assets/js/config.js"></script>
+</head>
+<body>
+<div class="container-narrow">
+  <div class="step-header">
+    <div class="eyebrow">Phases F + G - Effectiveness + loop-back / Step 8 of 10</div>
+    <h1>Verify effectiveness. Close or loop back.</h1>
+    <p>30/60/90 day checkpoints with evidence. Close the CAPA only when the metric moves. If not, re-enter at the weakest link.</p>
+  </div>
+
+  <details class="why">
+    <summary>Why this matters</summary>
+    <div class="why-body">
+      CAPA closure requires evidence of effectiveness. PDCA's Check phase tells you whether the countermeasure worked. If metrics did not move, re-enter: was the root cause wrong, the countermeasure inadequate, or execution incomplete?
+      <br /><a href="https://www.lean.org/lexicon-terms/pdca/" target="_blank" rel="noopener">Source: LEI PDCA</a>
+    </div>
+  </details>
+
+  <div class="card">
+    <h3>Log a checkpoint</h3>
+    <div class="two-col">
+      <div class="field">
+        <label for="checkpoint">Checkpoint</label>
+        <select id="checkpoint" class="select">
+          <option value="30_day">30 day</option>
+          <option value="60_day">60 day</option>
+          <option value="90_day">90 day</option>
+          <option value="ad_hoc">Ad hoc</option>
+        </select>
+      </div>
+      <div class="field"><label for="reviewed_at">Review date</label><input id="reviewed_at" type="date" class="input" /></div>
+      <div class="field">
+        <label for="verdict">Verdict</label>
+        <select id="verdict" class="select">
+          <option value="effective">Effective (metrics moved)</option>
+          <option value="partial">Partial (some movement)</option>
+          <option value="not_effective">Not effective (metrics did not move)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="recommended_action">Recommended action</label>
+        <select id="recommended_action" class="select">
+          <option value="close">Close the playbook</option>
+          <option value="continue_monitoring">Continue monitoring</option>
+          <option value="re_plan_long_term">Re-plan long-term action (Step 5 again)</option>
+          <option value="re_triage">Re-triage from Step 1</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="evidence_summary">Evidence summary</label>
+      <textarea id="evidence_summary" class="textarea" rows="3" placeholder="Scrap $ dropped from $120K to $22K over 30 days. Source: Power BI dashboard."></textarea>
+    </div>
+    <div class="field">
+      <label for="signed_by">Signed by (typed name acts as e-signature)</label>
+      <input id="signed_by" class="input" placeholder="Full name" />
+    </div>
+    <button id="add" class="btn btn-accent">Log checkpoint</button>
+  </div>
+
+  <h3 class="mt-3 mb-1">Loop-back diagnosis (when not effective)</h3>
+  <div class="card">
+    <p class="text-sm text-muted mb-2">If a checkpoint verdict is <b>not effective</b>, work through these three questions before re-entering:</p>
+    <ol style="padding-left:20px">
+      <li class="mb-1"><b>Was the root cause wrong?</b> Go back to Step 4 and test the evidence.</li>
+      <li class="mb-1"><b>Was the countermeasure inadequate?</b> Go back to Step 5 and design a stronger action.</li>
+      <li class="mb-1"><b>Did execution fail?</b> Check governance (Step 6): ownership, follow-through, standardization.</li>
+    </ol>
+  </div>
+
+  <h3 class="mt-3 mb-1">Checkpoint history</h3>
+  <div id="list"></div>
+
+  <h3 class="mt-3 mb-1">Playbook status</h3>
+  <div class="card">
+    <p class="text-sm text-muted mb-2">Lock in the current state.</p>
+    <div class="flex gap-1 flex-wrap">
+      <button id="close-pb" class="btn btn-ghost">Mark closed</button>
+      <button id="verify-pb" class="btn btn-ghost">Mark verifying</button>
+      <button id="reopen-pb" class="btn btn-danger">Re-open (loop back)</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, renderTopNav, getActivePlaybookId, renderProgress, renderWizardNav, toast, escapeHtml, confirmAction, fmtDate, fmtDateTime } from '/assets/js/core.js';
+import { listEffectiveness, addEffectiveness, updatePlaybook } from '/assets/js/data.js';
+
+async function boot() {
+  await requireAuth(); await renderTopNav(); renderProgress(8);
+  const pid = getActivePlaybookId();
+  if (!pid) { location.href = 'index.html'; return; }
+  document.getElementById('reviewed_at').value = new Date().toISOString().slice(0,10);
+
+  const listEl = document.getElementById('list');
+  async function refresh() {
+    const rows = await listEffectiveness(pid);
+    if (!rows.length) { listEl.innerHTML = '<p class="text-muted text-sm">No checkpoints logged yet.</p>'; return; }
+    listEl.innerHTML = '';
+    rows.forEach(r => {
+      const el = document.createElement('div'); el.className = 'row';
+      const vbadge = r.verdict === 'effective' ? 'green' : (r.verdict === 'partial' ? 'gold' : 'red');
+      el.innerHTML = `
+        <div class="row-body">
+          <div class="row-title">${r.checkpoint.replace(/_/g,' ')} - ${fmtDate(r.reviewed_at)} <span class="badge badge-${vbadge}">${r.verdict.replace(/_/g,' ')}</span></div>
+          <div class="row-meta">Action: ${r.recommended_action.replace(/_/g,' ')}${r.signed_by ? ' - Signed by ' + escapeHtml(r.signed_by) + ' at ' + fmtDateTime(r.signed_at) : ''}</div>
+          ${r.evidence_summary ? `<div class="text-sm mt-1">${escapeHtml(r.evidence_summary)}</div>` : ''}
+        </div>
+      `;
+      listEl.appendChild(el);
+    });
+  }
+
+  document.getElementById('add').addEventListener('click', async () => {
+    const reviewed_at = document.getElementById('reviewed_at').value;
+    if (!reviewed_at) { toast('Review date required', 'err'); return; }
+    const signed_by = document.getElementById('signed_by').value.trim();
+    if (!signed_by) { toast('Signature (typed name) required for closure', 'err'); return; }
+    const evidence_summary = document.getElementById('evidence_summary').value.trim();
+    if (!evidence_summary) { toast('Evidence summary required', 'err'); return; }
+    try {
+      await addEffectiveness(pid, {
+        checkpoint: document.getElementById('checkpoint').value,
+        reviewed_at,
+        verdict: document.getElementById('verdict').value,
+        evidence_summary,
+        recommended_action: document.getElementById('recommended_action').value,
+        signed_by,
+        signed_at: new Date().toISOString()
+      });
+      document.getElementById('signed_by').value = '';
+      document.getElementById('evidence_summary').value = '';
+      toast('Checkpoint logged', 'ok');
+      refresh();
+    } catch (e) { toast(e.message, 'err'); }
+  });
+
+  document.getElementById('close-pb').addEventListener('click', async () => {
+    if (!confirmAction('Mark this playbook closed? Reversible later.')) return;
+    await updatePlaybook(pid, { status: 'closed', closed_at: new Date().toISOString() }); toast('Closed', 'ok');
+  });
+  document.getElementById('verify-pb').addEventListener('click', async () => {
+    await updatePlaybook(pid, { status: 'verifying' }); toast('Set to verifying', 'ok');
+  });
+  document.getElementById('reopen-pb').addEventListener('click', async () => {
+    if (!confirmAction('Re-open this playbook for loop-back?')) return;
+    await updatePlaybook(pid, { status: 'reopened', closed_at: null }); toast('Re-opened', 'ok');
+  });
+
+  renderWizardNav(8);
+  refresh();
+}
+boot();
+</script>
+</body>
+</html>
